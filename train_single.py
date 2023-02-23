@@ -14,7 +14,7 @@ from albumentations.pytorch import ToTensorV2
 from models import UNet11
 import argparse
 
-debug = True
+debug = False
 
 parser = argparse.ArgumentParser()
 parser.add_argument("organ_id", help="ID of the organ to train a model for", type=int)
@@ -234,7 +234,6 @@ for e in range(epochs):
             continue
         img = img.to(device)
         lbl = lbl.to(device).long()
-
 
         with torch.cuda.amp.autocast(enabled=mixed_precision):
 
