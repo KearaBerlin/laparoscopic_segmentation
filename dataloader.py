@@ -12,7 +12,7 @@ import multiprocessing
 
 class CobotLoaderBinary(Dataset):
 
-    def __init__(self, root_dir, label, num_labels, transform, image_size=None, id=-1):
+    def __init__(self, root_dir, label, num_labels, transform, image_size=None, id=-1, create_negative_labels=False):
         self.root_dir = root_dir
         self.images = []
         self.labels = []
@@ -20,6 +20,7 @@ class CobotLoaderBinary(Dataset):
         self.label = label
 
         self.transform = transform
+        self.create_negative_labels = create_negative_labels
 
         self.num_pixels = 0
         self.num_bg_pixels = 0
@@ -27,6 +28,7 @@ class CobotLoaderBinary(Dataset):
         self.a_masks = []
 
         self.id = id
+        self.num_labels = num_labels
     
         for file in os.listdir(root_dir):
             if "png" in file and file[0:5] == "image": 
@@ -47,7 +49,7 @@ class CobotLoaderBinary(Dataset):
                 self.num_bg_pixels += np.sum(mask_orig == 0)
                 self.num_pixels += mask_orig.shape[0]*mask_orig.shape[1]
 
-                mask = (mask_orig > 0)*label
+                mask = (mask_orig > 0)*1
 
                 self.images.append(img)
                 self.labels.append(mask)
@@ -61,6 +63,34 @@ class CobotLoaderBinary(Dataset):
     def __getitem__(self, idx):
         img = self.images[idx]
         mask = self.labels[idx]
+
+        if self.create_negative_labels:
+            masks = []
+            mask_dict = {}
+            mask = self.labels[idx]
+            mask_dict["mask"] = mask
+
+            neg_mask = mask - 1   
+
+            for i in range(self.num_labels):
+                str = "mask%d" % i
+                if i == self.label - 1:
+                    c_mask = mask
+                else:
+                    c_mask = neg_mask
+                mask_dict[str] = c_mask
+
+            transformed = self.transform(image=self.images[idx], **mask_dict)
+
+            for i in range(self.num_labels):
+                str = "mask%d" % i
+                masks.append(transformed[str])
+            
+            mask = np.stack(masks, axis=0)
+            img = transformed["image"]
+            mask_orig = transformed["mask"]
+
+            return img, mask, self.label, mask_orig
             
         if not self.transform is None:
             transformed = self.transform(image=img, mask=mask)
@@ -68,5 +98,5 @@ class CobotLoaderBinary(Dataset):
             img = transformed["image"]
             mask = transformed["mask"]
       
-        return img, mask
+        return img, mask, self.label
         

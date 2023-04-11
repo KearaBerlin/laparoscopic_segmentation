@@ -1,4 +1,5 @@
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
+from transformers import SegformerForSemanticSegmentation
 from torchvision import models
 import torch
 import dataloader
@@ -54,8 +55,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("organ_id", help="ID of the organ to train a model for", type=int)
 parser.add_argument("data_dir", help="Path to DSAD dataset")
 parser.add_argument("model_path", help="Path to model")
+parser.add_argument("--segformer", help="Specifity to use SegFormer instead of DeepLabV3", action="store_true")
 parser.add_argument("--unet", help="Specifity to use UNet instead of DeepLabV3", action="store_true")
 args = parser.parse_args()
+
+if args.unet and args.segformer:
+    print("You cannot specify both segformer and unet")
+    exit()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
@@ -106,6 +112,8 @@ model_path = args.model_path
 
 if args.unet:
     model = UNet11(num_classes=num_classes, pretrained=True)
+elif args.segformer:
+    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b3-finetuned-cityscapes-1024-1024",num_labels=num_classes,ignore_mismatched_sizes=True)
 else:
     model = models.segmentation.deeplabv3_resnet50(pretrained=True, progress=True)
     model.classifier = DeepLabHead(2048, num_classes)
@@ -165,8 +173,14 @@ with torch.inference_mode():
         lbl = lbl.to(device).long()
 
         with torch.cuda.amp.autocast(enabled=mixed_precision):
-            outputs = model(img)['out']
-            pred = torch.argmax(outputs, 1)
+            outputs = model(img)
+            if args.unet:
+                out = outputs
+            elif args.segformer:
+                out = nn.functional.interpolate(outputs["logits"], size=img.shape[-2:], mode="bilinear", align_corners=False)
+            else:
+                out = outputs['out']
+            pred = torch.argmax(out, 1)
             for j in range(pred.size(0)):
                 preds.append(np.ndarray.flatten(pred[j].cpu().numpy()))
                 labels.append(np.ndarray.flatten(lbl[j].cpu().numpy()))

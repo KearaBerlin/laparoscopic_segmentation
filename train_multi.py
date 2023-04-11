@@ -1,5 +1,3 @@
-from torchvision.models.segmentation.deeplabv3 import DeepLabHead
-from transformers import SegformerForSemanticSegmentation
 from torchvision import models
 import torch
 import dataloader
@@ -12,22 +10,16 @@ import sys
 import albumentations as A
 import albumentations.augmentations.functional as F
 from albumentations.pytorch import ToTensorV2
-from models import UNet11
 import argparse
+from models_multi import MultiHeadSegFormer, MultiHeadDeepLab
 
 debug = False
 
 parser = argparse.ArgumentParser()
-parser.add_argument("organ_id", help="ID of the organ to train a model for", type=int)
 parser.add_argument("data_dir", help="Path to DSAD dataset")
 parser.add_argument("output_dir", help="Path to output folder")
 parser.add_argument("--segformer", help="Specifity to use SegFormer instead of DeepLabV3", action="store_true")
-parser.add_argument("--unet", help="Specifity to use UNet instead of DeepLabV3", action="store_true")
 args = parser.parse_args()
-
-if args.unet and args.segformer:
-    print("You cannot specify both segformer and unet")
-    exit()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 mixed_precision = True
@@ -45,15 +37,12 @@ organs = ["abdominal_wall",
             "ureter",
             "vesicular_glands"]
 
-organ_id = args.organ_id
-organ = organs[organ_id]
-
 val_ids = ["03", "21", "26"] # Validation IDs of DSAD
 
 test_ids = ["02", "07", "11", "13", "14", "18", "20", "32"] # Test IDs of DSAD
 
 # Parameters for training
-num_classes = 2
+num_classes = len(organs)
 batch_size = 16
 mini_batch_size = 16
 best_f1 = 0
@@ -61,9 +50,7 @@ num_mini_batches = batch_size//mini_batch_size
 image_size = (640, 512)
 lr = 1e-4
 
-output_folder = "Seg_single_" + organ
-if args.unet:
-    output_folder += "_unet"
+output_folder = "Seg_multi"
 
 if args.segformer:
     output_folder += "_segformer"
@@ -102,19 +89,19 @@ def init_metrics(list, num_labels):
 def update_metrics(list, pred, lbl):
     for i in range(pred.size(0)):
         label = torch.max(lbl[i]).item()
-        tp = torch.sum((pred[i] == label)*(lbl[i] != 0)).item()
-        fp = torch.sum((pred[i] == label)*(lbl[i] == 0)).item()
-        fn = torch.sum((pred[i] != label)*(lbl[i] != 0)).item()
-        tn = torch.sum((pred[i] == 0)*(lbl[i] == 0)).item()
-
-        list[label][0] += tp
-        list[label][1] += fp
-        list[label][2] += fn
+        tp = torch.sum((pred[i] == label)*(lbl[i] == label)).item()
+        fp = torch.sum((pred[i] == label)*(lbl[i] != label)).item()
+        fn = torch.sum((pred[i] != label)*(lbl[i] == label)).item()
+        tn = torch.sum((pred[i] == 0)*(lbl[i] != label)).item()
+        
+        list[label-1][0] += tp
+        list[label-1][1] += fp
+        list[label-1][2] += fn
         if (tp + fp + fn) > 0:
             f1 = tp/(tp + 0.5*(fp + fn))
             jc = tp/(tp + fp + fn)
-            list[label][3].append(f1)
-            list[label][4].append(jc)
+            list[label-1][3].append(f1)
+            list[label-1][4].append(jc)
 
 def compute_avg_metrics(list, ignore_zero_label=True):
     f1s = []
@@ -147,56 +134,60 @@ def compute_avg_metrics(list, ignore_zero_label=True):
             
     return np.nanmean(f1s), np.nanmean(prs), np.nanmean(rcs), np.nanmean(jcs), np.nanmean(f1s2), np.nanmean(jcs2)
 
-weights = np.zeros(num_classes, dtype=np.float32)
+weights = np.zeros((2, num_classes), dtype=np.float32)
 
 for x in os.walk(data_folder):
     val = False
-    test = False
 
     if debug:
         if not "03" in x[0] and not "04" in x[0] and not "05" in x[0]:
             continue
 
-    if organ in x[0]:
-        c_lbl = 1
-    else:
-        continue
-
     if not os.path.isfile(x[0] + "/image00.png"):
         continue
-
-    for id in test_ids: #Skip test data
-        if id in x[0]:
-            test = True
+    c_lbl = -1
+    for i in range(len(organs)):
+        if organs[i] in x[0]:
+            c_lbl = i + 1
             break
-    if test:
-        continue #Skip test data
+    
+    if c_lbl == -1:
+        continue
 
     for id in val_ids:
         if id in x[0]:
             val = True
             break
-    print(x[0])
+    test = False
+    for id in test_ids:
+        if id in x[0]:
+            test = True
+            break
     
-    # Create dataloaders
+    if test:
+        continue
+    print(x[0])
     if val:
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, num_classes, val_transform, image_size=image_size)
         val_sets.append(dataset)
     else:
-        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, num_classes, train_transform, image_size=image_size)
+        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, num_classes, train_transform, image_size=image_size, create_negative_labels=True)
         train_sets.append(dataset)
-        #Collect frequencies for class weights
         bg_w, p = dataset.get_frequency()
         c_w = p - bg_w 
-        weights[0] += bg_w
-        weights[c_lbl] += c_w
+        weights[0, c_lbl-1] += bg_w
+        weights[1, c_lbl-1] += c_w
 
 print(weights)
-n_samples = np.sum(weights)
+weight = np.zeros(2, dtype=np.float32)
+for i in range(len(organs)):
+    n_samples = weights[0, i] + weights[1, i]
+    weight[0] += n_samples/(2*weights[0, i])
+    weight[1] += n_samples/(2*weights[1, i])
+    print(i, weight)
+weight/=len(organs)
 
-weights = n_samples/(num_classes*weights)
-weights[weights == np.inf] = 0.1
-print(weights)
+criterion = nn.CrossEntropyLoss(weight=torch.Tensor(weight).to(device), ignore_index=-1)
 
 train_sets = torch.utils.data.ConcatDataset(train_sets)
 val_sets = torch.utils.data.ConcatDataset(val_sets)
@@ -204,18 +195,13 @@ val_sets = torch.utils.data.ConcatDataset(val_sets)
 train_loader = torch.utils.data.DataLoader(train_sets, batch_size=mini_batch_size, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_sets, batch_size=mini_batch_size, shuffle=False)
 
-if args.unet:
-    model = UNet11(num_classes=num_classes, pretrained=True)
-elif args.segformer:
-    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b3-finetuned-cityscapes-1024-1024",num_labels=num_classes,ignore_mismatched_sizes=True)
+if args.segformer:
+    model = MultiHeadSegFormer(num_classes)
 else:
-    model = models.segmentation.deeplabv3_resnet50(pretrained=True, progress=True)
-    model.classifier = DeepLabHead(2048, num_classes)
+    model = MultiHeadDeepLab(num_classes)
 
 model.train()
 model.to(device)
-
-criterion = nn.CrossEntropyLoss(weight=torch.Tensor(weights).to(device))
 
 optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=lr, weight_decay=1e-1)#, weight_decay=0.001)
 scheduler = optim.lr_scheduler.StepLR(optimizer, 10, 0.9, verbose=True)
@@ -238,30 +224,48 @@ for e in range(epochs):
     init_metrics(train_metrics, num_classes)
     init_metrics(val_metrics, num_classes)
 
-    for img, lbl, _ in train_loader:
-        if img.size(0) < 2:
+    for img, lbl_orig, lbls, mask_orig in train_loader:
+        if img.size(0) < mini_batch_size:
             continue
+
         img = img.to(device)
-        lbl = lbl.to(device).long()
+        lbl = lbl_orig.to(device).long()
+        u_lbls = mask_orig.to(device).long()
+        lbls = lbls.to(device) - 1
 
         with torch.cuda.amp.autocast(enabled=mixed_precision):
 
             outputs = model(img)
-            if args.unet:
-                out = outputs
-            elif args.segformer:
-                out = nn.functional.interpolate(outputs["logits"], size=img.shape[-2:], mode="bilinear", align_corners=False)
-            else:
-                out = outputs['out']
-            
+            out = torch.stack(outputs, dim=2)
+        
             loss = criterion(out, lbl)
             
             pred = torch.argmax(out, 1)
 
-            update_metrics(train_metrics, pred, lbl)
+            with torch.no_grad():
+                outputs2 = torch.stack(outputs, dim=1)
+                ind = lbls
+                dims = [1]
+                for s in outputs2.shape[2:]:
+                    ind = ind.unsqueeze(-1)
+                    dims.append(s)
 
-            train_loss.append(loss.item())
-            train_accuracy.append(torch.sum(pred == lbl).item()/(mini_batch_size*image_size[0]*image_size[1]))
+                ind = ind.repeat(dims)
+
+                ind = ind.unsqueeze(1)
+
+                output_filter = torch.gather(outputs2, 1, ind)
+                output_filter = output_filter.squeeze(1)
+                u_preds = torch.argmax(output_filter.detach(), dim=1)
+                for b in range(u_preds.shape[0]):
+                    u_preds[b] = u_preds[b]*(lbls[b] + 1)
+                    u_lbls[b] = u_lbls[b]*(lbls[b] + 1)
+
+                update_metrics(train_metrics, u_preds, u_lbls)
+
+                train_loss.append(loss.item())
+
+                train_accuracy.append(torch.sum(u_preds == u_lbls).item()/(mini_batch_size*image_size[0]*image_size[1]))
 
         if mixed_precision:
             scaler.scale(loss).backward()
@@ -288,27 +292,45 @@ for e in range(epochs):
     preds = []
 
     with torch.no_grad():
-        for img, lbl, _ in val_loader:
+        for img, lbl, lbls in val_loader:
             img = img.to(device)
             lbl = lbl.to(device).long()
+            lbls = lbls.to(device) - 1
 
             with torch.cuda.amp.autocast(enabled=mixed_precision):
                 outputs = model(img)
 
-                if args.unet:
-                    out = outputs
-                elif args.segformer:
-                    out = nn.functional.interpolate(outputs["logits"], size=img.shape[-2:], mode="bilinear", align_corners=False)
-                else:
-                    out = outputs['out']
-                loss = criterion(out, lbl)
-                pred = torch.argmax(out, 1)
-                preds.append(pred.cpu().numpy())
+                loss = 0
+                u_preds = []
+                u_lbl = []
+                pr = []
 
-                update_metrics(val_metrics, pred, lbl)
+                outputs = torch.stack(outputs, dim=1)
+
+                ind = lbls
+                dims = [1]
+                for s in outputs.shape[2:]:
+                    ind = ind.unsqueeze(-1)
+                    dims.append(s)
+
+                ind = ind.repeat(dims)
+
+                ind = ind.unsqueeze(1)
+
+                output_filter = torch.gather(outputs, 1, ind)
+                output_filter = output_filter.squeeze(1)
+                
+                loss = criterion(output_filter, lbl)
+
+                u_preds = torch.argmax(output_filter, dim=1).detach()
+                for b in range(u_preds.shape[0]):
+                    u_preds[b]*=lbls[b]+1
+                    lbl[b]*=(lbls[b]+1)
+
+                update_metrics(val_metrics, u_preds, lbl)
 
                 val_loss.append(loss.item())
-                val_accuracy.append(torch.sum(pred == lbl).item()/(mini_batch_size*image_size[0]*image_size[1]))
+                val_accuracy.append(torch.sum(u_preds == lbl).item()/(mini_batch_size*image_size[0]*image_size[1]))
 
     train_metrics, train_pr, train_rc, train_jac, train_f1_2, train_jac_2 = compute_avg_metrics(train_metrics)
     val_metrics, val_pr, val_rc, val_jac, val_f1_2, val_jac_2 = compute_avg_metrics(val_metrics)
