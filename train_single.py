@@ -15,6 +15,7 @@ from albumentations.pytorch import ToTensorV2
 from models import UNet11
 import argparse
 from torch.utils.tensorboard import SummaryWriter
+from torcheval.metrics import BinaryAccuracy, BinaryF1Score, BinaryPrecision, BinaryRecall
 
 debug = False
 
@@ -96,11 +97,11 @@ val_sets = []
 print("Loading data")
 
 #Functions for calculating metrics
-def init_metrics(list, num_labels):
+def init_metrics(m_list, num_labels):
     for i in range(num_labels):
-        list.append([0,0,0,[],[]])
+        m_list.append([0,0,0,[],[]])
 
-def update_metrics(list, pred, lbl):
+def update_metrics(m_list, pred, lbl):
     for i in range(pred.size(0)):
         label = torch.max(lbl[i]).item()
         tp = torch.sum((pred[i] == label)*(lbl[i] != 0)).item()
@@ -108,14 +109,17 @@ def update_metrics(list, pred, lbl):
         fn = torch.sum((pred[i] != label)*(lbl[i] != 0)).item()
         tn = torch.sum((pred[i] == 0)*(lbl[i] == 0)).item()
 
-        list[label][0] += tp
-        list[label][1] += fp
-        list[label][2] += fn
+        m_list[label][0] += tp
+        m_list[label][1] += fp
+        m_list[label][2] += fn
         if (tp + fp + fn) > 0:
             f1 = tp/(tp + 0.5*(fp + fn))
             jc = tp/(tp + fp + fn)
-            list[label][3].append(f1)
-            list[label][4].append(jc)
+            m_list[label][3].append(f1)
+            m_list[label][4].append(jc)
+            
+        for metric in pytorch_metrics:
+            metric.update(pred[i].flatten(), lbl[i].flatten())
 
 def compute_avg_metrics(m_list, ignore_zero_label=True):
 	# I think f1s2 and jcs2 are lists of the metrics calculated at the
@@ -149,10 +153,18 @@ def compute_avg_metrics(m_list, ignore_zero_label=True):
         jcs2.append(np.mean(m_list[i][4]))
             
     return np.nanmean(f1s), np.nanmean(prs), np.nanmean(rcs), np.nanmean(jcs), np.nanmean(f1s2), np.nanmean(jcs2)
+    
+def compute_pytorch_metrics():
+    metric_vals = []
+    for metric in pytorch_metrics:
+        metric_vals.append(metric.compute())
+        metric.reset()
+    
+    return metric_vals
 
-def tb_log(epoch, writer, train_loss, val_loss, pr, rc, jac, f1):
-    names = ["train_loss", "val_loss", "precision", "recall", "jaccard", "f1"]
-    metrics = [train_loss, val_loss, pr, rc, jac, f1]
+def tb_log(epoch, writer, names, metrics):
+    #names = ["train_loss", "val_loss", "precision", "recall", "jaccard", "f1"]
+    #metrics = [train_loss, val_loss, pr, rc, jac, f1]
     for name, metric in zip(names, metrics):
         writer.add_scalar(name, metric, epoch)
     writer.flush()
@@ -233,11 +245,21 @@ optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), l
 scheduler = optim.lr_scheduler.StepLR(optimizer, 10, 0.9, verbose=True)
 scaler = torch.cuda.amp.GradScaler(enabled=True)
 
+binary_acc = BinaryAccuracy(device=device)
+binary_f1 = BinaryF1Score(device=device)
+binary_pc = BinaryPrecision(device=device)
+binary_rc = BinaryRecall(device=device)
+pytorch_metrics = [binary_acc, binary_f1, binary_pc, binary_rc]
+pytorch_metric_names = ["acc", "f1", "pc", "rc"]
+
 log_file = open(os.path.join(output_folder, "log.txt"), "w")
 print("Training model")
 for e in range(epochs):
     optimizer.zero_grad()
     train_batches = 0
+    val_batches = 0
+    train_loss_sum = 0
+    val_loss_sum = 0
 
     model.train()
     train_loss = []
@@ -273,6 +295,7 @@ for e in range(epochs):
             update_metrics(train_metrics, pred, lbl)
 
             train_loss.append(loss.item())
+            train_loss_sum += loss.item()
             train_accuracy.append(torch.sum(pred == lbl).item()/(mini_batch_size*image_size[0]*image_size[1]))
 
         if mixed_precision:
@@ -320,12 +343,22 @@ for e in range(epochs):
                 update_metrics(val_metrics, pred, lbl)
 
                 val_loss.append(loss.item())
+                val_loss_sum += loss.item()
                 val_accuracy.append(torch.sum(pred == lbl).item()/(mini_batch_size*image_size[0]*image_size[1]))
+                val_batches += 1
 
     train_metrics, train_pr, train_rc, train_jac, train_f1_2, train_jac_2 = compute_avg_metrics(train_metrics)
     val_metrics, val_pr, val_rc, val_jac, val_f1_2, val_jac_2 = compute_avg_metrics(val_metrics)
     # TODO check how jac and f1 calculated; use an existing library instead?
-    tb_log(e, writer, np.mean(train_loss), np.mean(val_loss), val_pr, val_rc, val_jac_2, val_f1_2)
+    #tb_log(e, writer, np.mean(train_loss), np.mean(val_loss), val_pr, val_rc, val_jac_2, val_f1_2)
+    
+    metric_vals = compute_pytorch_metrics()
+    train_loss_val = train_loss_sum / train_batches if train_batches > 0 else 1
+    val_loss_val = val_loss_sum / val_batches if val_batches > 0 else 1
+    
+    names = ["train_loss", "val_loss", *pytorch_metric_names, "jac"]
+    metrics = [train_loss_val, val_loss_val, *metric_vals, val_jac]
+    tb_log(e, writer, names, metrics)
 
     s = """Epoch %d: Train (loss %.3f accuracy %.3f f1 %.3f (f1 %.3f) pr %.3f rc %.3f jac %.3f (jac %.3f ) Validation (loss %.3f accuracy %.3f f1 %.3f (f1 %.3f) pr %.3f rc %.3f jac %.3f (jac %.3f )""" % (e, np.mean(train_loss), np.mean(train_accuracy), train_metrics, train_f1_2, train_pr, train_rc, train_jac, train_jac_2, np.mean(val_loss), np.mean(val_accuracy), val_metrics, val_f1_2, val_pr, val_rc, val_jac, val_jac_2)
     print(s)
