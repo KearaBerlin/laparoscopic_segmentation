@@ -39,6 +39,10 @@ sys.modules[config_namespace] = config
 spec.loader.exec_module(config)
 cfg = config.Config()
 
+print(f"Using config file {args.config_name}")
+print(f"config path: {args.config_dir}\n")
+print(cfg)
+
 if cfg.unet and cfg.segformer:
     print("You cannot specify both segformer and unet")
     exit()
@@ -181,10 +185,11 @@ train_loader = torch.utils.data.DataLoader(train_sets, batch_size=cfg.mini_batch
 val_loader = torch.utils.data.DataLoader(val_sets, batch_size=cfg.mini_batch_size, shuffle=False)
 
 writer = SummaryWriter()
+writer.add_text("ConfigName", args.config_name, global_step=0)
 
-if args.unet:
+if cfg.unet:
     model = UNet11(num_classes=cfg.num_classes, pretrained=True)
-elif args.segformer:
+elif cfg.segformer:
     model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b3-finetuned-cityscapes-1024-1024",num_labels=num_classes,ignore_mismatched_sizes=True)
 else:
     model = models.segmentation.deeplabv3_resnet50(pretrained=True, progress=True)
@@ -237,9 +242,9 @@ for e in range(cfg.epochs):
         with torch.cuda.amp.autocast(enabled=cfg.mixed_precision):
 
             outputs = model(img)
-            if args.unet:
+            if cfg.unet:
                 out = outputs
-            elif args.segformer:
+            elif cfg.segformer:
                 out = nn.functional.interpolate(outputs["logits"], size=img.shape[-2:], mode="bilinear", align_corners=False)
             else:
                 out = outputs['out']
@@ -286,9 +291,9 @@ for e in range(cfg.epochs):
             with torch.cuda.amp.autocast(enabled=cfg.mixed_precision):
                 outputs = model(img)
 
-                if args.unet:
+                if cfg.unet:
                     out = outputs
-                elif args.segformer:
+                elif cfg.segformer:
                     out = nn.functional.interpolate(outputs["logits"], size=img.shape[-2:], mode="bilinear", align_corners=False)
                 else:
                     out = outputs['out']
