@@ -61,7 +61,7 @@ mini_batch_size = 16
 best_f1 = 0
 num_mini_batches = batch_size//mini_batch_size
 image_size = (640, 512)
-lr = 1e-4
+lr = 1e-5
 
 output_folder = "Seg_single_" + organ
 if args.unet:
@@ -168,6 +168,7 @@ def tb_log(epoch, writer, names, metrics):
     for name, metric in zip(names, metrics):
         writer.add_scalar(name, metric, epoch)
     writer.flush()
+    print(f"Epoch {epoch}: val loss: {metrics[1]} jac: {metrics[4]}")
 
 weights = np.zeros(num_classes, dtype=np.float32)
 
