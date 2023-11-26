@@ -205,6 +205,8 @@ binary_rc = BinaryRecall(device=device)
 pytorch_metrics = [binary_acc, binary_f1, binary_pc, binary_rc]
 pytorch_metric_names = ["acc", "f1", "pc", "rc"]
 
+best_f1 = 0
+
 log_file = open(os.path.join(cfg.output_folder, "log.txt"), "w")
 print("Training model")
 for e in range(cfg.epochs):

@@ -39,7 +39,6 @@ class Config():
     NUM_CLASSES = 2
     BATCH_SIZE = 16
     MINI_BATCH_SIZE = 16
-    BEST_F1 = 0
     IMAGE_SIZE = (640, 512)
     LR = 1e-4
 
