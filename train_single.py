@@ -1,5 +1,5 @@
-# from torchvision.models.segmentation.deeplabv3 import DeepLabHead
-# from transformers import SegformerForSemanticSegmentation
+from torchvision.models.segmentation.deeplabv3 import DeepLabHead
+from transformers import SegformerForSemanticSegmentation
 from torchvision import models
 import torch
 import dataloader
