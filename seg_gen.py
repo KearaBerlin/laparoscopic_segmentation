@@ -2,6 +2,35 @@ import cv2
 import numpy as np
 
 
+class Contour:
+    def __init__(self, mask):
+        self.MAX_CONTOUR_PTS = 60
+        self.mask = mask
+        contours1, _ = cv2.findContours(cv2.cvtColor(self.mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
+                                        cv2.CHAIN_APPROX_NONE)
+        self.contour = contours1[0]
+        max_pts = min(self.MAX_CONTOUR_PTS, len(self.contour))
+        rect = cv2.boundingRect(self.contour)
+
+        # offset is (x_off, y_off)
+        self.offset = (int(self.mask.shape[1] / 2 - (rect[0] + rect[2] / 2)),
+                       int(self.mask.shape[0] / 2 - (rect[1] + rect[3] / 2)))
+
+        self.corners = cv2.approxPolyDP(self.contour, 10, True)
+        self.cnt_off = self.contour + self.offset
+        self.corn_off = self.corners + self.offset
+        self.cnt_len = cv2.arcLength(self.contour, True)
+
+class ContourIterator:
+    def __init__(self, contour: Contour):
+        self.contour = contour
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        pass
+
 class SegGen:
     def __init__(self, image_file_name, mask_file_name):
         self.MAX_CONTOUR_PTS = 60
@@ -98,3 +127,9 @@ class SegGen:
         # generate the final image
         img = np.bitwise_or(np.bitwise_and(np.bitwise_not(self.mask1), self.img1), np.bitwise_and(obj2_warped, self.mask1))
         return img
+
+    def match_contours(self, cnt1: Contour, cnt2: Contour):
+
+        pass
+
+
