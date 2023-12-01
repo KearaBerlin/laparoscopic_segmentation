@@ -18,7 +18,7 @@ class Config():
 
     MIXED_PRECISION = True
     EPOCHS = 100
-    LR = 1e-4
+    LR = 1e-5
 
     ORGANS = ["abdominal_wall",
                 "colon",
