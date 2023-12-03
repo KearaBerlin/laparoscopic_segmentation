@@ -202,10 +202,10 @@ for x in os.walk(data_folder):
 
     # Create dataloaders
     if val:
-        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, num_classes, val_transform, image_size=image_size)
+        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, num_classes, val_transform, image_size=image_size, k_aug=0.1)
         val_sets.append(dataset)
     else:
-        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, num_classes, train_transform, image_size=image_size)
+        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, num_classes, train_transform, image_size=image_size, k_aug=0.1)
         train_sets.append(dataset)
         #Collect frequencies for class weights
         bg_w, p = dataset.get_frequency()
