@@ -57,7 +57,8 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(img_pair1[0], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
-    def __init__(self, root_dir, label, num_labels, transform, image_size=None, id=-1, create_negative_labels=False,
+    def __init__(self, root_dir, label, organ_name, num_labels, 
+                 transform, image_size=None, id=-1, create_negative_labels=False,
                  k_aug=0.0):
 
         self.root_dir = root_dir
@@ -65,6 +66,7 @@ class CobotLoaderBinary(Dataset):
         self.labels = []
 
         self.label = label
+        self.organ_name = organ_name
 
         self.transform = transform
         self.create_negative_labels = create_negative_labels
@@ -82,10 +84,10 @@ class CobotLoaderBinary(Dataset):
         for file in os.listdir(self.root_dir):
             if "png" in file and file[0:5] == "image":
                 file = os.path.join(self.root_dir, file)
-                self.files.append((file, file.replace("image", "mask")))
+                mask_filename = file.replace("image", "mask").replace(".png", f"_{organ_name}.png")
+                self.files.append((file, mask_filename))
 
-        for pair in self.files:
-            file, mask_file = pair
+        for file, mask_file in self.files:
             img = cv2.imread(file)
             mask_orig = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
