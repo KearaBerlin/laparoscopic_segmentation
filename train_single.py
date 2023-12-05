@@ -79,6 +79,8 @@ def tb_log(epoch, writer, names, metrics):
 
 weights = np.zeros(cfg.num_classes, dtype=np.float32)
 
+multilabel = "multilabel" in cfg.data_dir
+
 for x in os.walk(cfg.data_dir):
     val = False
     test = False
@@ -110,10 +112,10 @@ for x in os.walk(cfg.data_dir):
 
     # Create dataloaders
     if val:
-        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.val_transform, image_size=cfg.image_size, k_aug=0.1)
+        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.organ, cfg.num_classes, cfg.val_transform, image_size=cfg.image_size, k_aug=0.1)
         val_sets.append(dataset)
     else:
-        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.train_transform, image_size=cfg.image_size, k_aug=0.1)
+        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.organ, cfg.num_classes, cfg.train_transform, image_size=cfg.image_size, k_aug=0.1)
         train_sets.append(dataset)
         #Collect frequencies for class weights
         bg_w, p = dataset.get_frequency()
@@ -140,7 +142,7 @@ writer.add_text("ConfigName", args.config_name, global_step=0)
 if cfg.unet:
     model = UNet11(num_classes=cfg.num_classes, pretrained=True)
 elif cfg.segformer:
-    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b3-finetuned-cityscapes-1024-1024",num_labels=num_classes,ignore_mismatched_sizes=True)
+    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b3-finetuned-cityscapes-1024-1024",num_labels=cfg.num_classes,ignore_mismatched_sizes=True)
 else:
     model = models.segmentation.deeplabv3_resnet50(pretrained=True, progress=True)
     model.classifier = DeepLabHead(2048, cfg.num_classes)
