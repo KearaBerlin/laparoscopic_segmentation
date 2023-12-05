@@ -146,9 +146,49 @@ class ContourIterator:
 
 
 class Contour:
-    def __init__(self, mask):
+
+    def __map_corners(self):
+        self.corner_map = np.empty(len(self.corners), dtype=int)
+        p_idx = 0
+        c_idx = 0
+
+        for c in self.corners:
+            while True:
+                p = self.contour[p_idx]
+                if np.array_equal(c[0], p[0]):
+                    self.corner_map[c_idx] = p_idx
+                    c_idx += 1
+                    p_idx = (p_idx + 1) % len(self.contour)
+                    break
+                p_idx = (p_idx + 1) % len(self.contour)
+
+        assert c_idx == len(self.corners)
+
+    def __norm_contour(self, num_pts):
+        cnt_len_per_segment = self.cnt_len / num_pts
+        result = list()
+        i = self.corner_map[0]
+
+        for j_idx in range(1, len(self.corner_map)):
+            j = self.corner_map[j_idx]
+            diff = j - i if j > i else len(self.contour) - i + j
+            segments = round(diff / cnt_len_per_segment)
+            if segments > 0:
+                segment_len = int(diff / segments)
+                for s in range(segments):
+                    result.append(self.contour[i])
+                    i = (i + segment_len) % self.cnt_len
+            i = j
+        # add last corner
+        result.append(self.contour[i])
+        self.norm_contour = np.asarray(result)
+        pass
+
+    def __init__(self, mask, num_pts=0):
         # the higher the number, the rougher the corner estimation
-        self.CORNER_APPROX_EPSILON = 9
+        self.CORNER_APPROX_EPSILON = 8
+        self.MAX_CONTOUR_PTS = 64
+
         self.mask = mask
         contours1, _ = cv2.findContours(cv2.cvtColor(self.mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
                                         cv2.CHAIN_APPROX_NONE)
@@ -157,12 +197,21 @@ class Contour:
 
         # offset is (x_off, y_off)
         self._offset = (int(self.mask.shape[1] / 2 - (self._rect[0] + self._rect[2] / 2)),
-                       int(self.mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
+                        int(self.mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
 
         self.corners = cv2.approxPolyDP(self.contour, self.CORNER_APPROX_EPSILON, True)
+        self.cnt_len = len(self.contour) + 1 # because it's in pixels
+
+        # map the corners back into the contour
+        self.__map_corners()
+        self.__norm_contour(num_pts if num_pts > 0 else self.MAX_CONTOUR_PTS)
+
         self.cnt_off = self.contour + self._offset
         self.corn_off = self.corners + self._offset
-        #self.cnt_len = cv2.arcLength(self.contour, True)
+        self.norm_contour = self.norm_contour + self._offset
+
+    def num_pts(self):
+        return len(self.norm_contour)
 
     def offset(self):
         return self._offset
