@@ -7,7 +7,7 @@ class SegGen:
 
     def __find_contours(self, mask):
         contours, _ = cv2.findContours(cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
-                                        cv2.CHAIN_APPROX_NONE)
+                                             cv2.CHAIN_APPROX_NONE)
         longest_contour = []
         for cnt in contours:
             if len(cnt) > len(longest_contour):
@@ -21,13 +21,6 @@ class SegGen:
         self.contour1 = self.__find_contours(self.mask1)
         max_pts = min(self.MAX_CONTOUR_PTS, len(self.contour1))
 
-        # compute the offset of the "center" of the mask relative to image center
-        # todo: could use "center of mass" or just center of bounding rectangle
-        # M = cv2.moments(contours1[0])
-        # cX = int(M["m10"] / M["m00"])
-        # cY = int(M["m01"] / M["m00"])
-        # off1 = (mask1.shape[1] / 2 - cX, mask1.shape[0] / 2 - cY)
-
         # roi is (x, y, w, h)
         self.obj1_roi = cv2.boundingRect(self.contour1)
         # offset is (x_off, y_off)
@@ -36,7 +29,6 @@ class SegGen:
 
         # normalize contours
         self.norm_ctrs1 = self.contour1[0::int(len(self.contour1) / max_pts)]
-        # todo: enhance contours with corners, etc
         self.ctr_pts = len(self.norm_ctrs1)
         # center the contours in the image
         self.norm_ctrs1 += self.off1
@@ -59,7 +51,6 @@ class SegGen:
         obj2 = np.bitwise_and(img2, mask2)
         contour2 = self.__find_contours(mask2)
 
-        #todo did we get the right number of points?
         norm_ctrs2 = contour2[0::int(len(contour2) / (self.ctr_pts + 1))]
         norm_ctrs2 = norm_ctrs2[0:self.ctr_pts]
 
@@ -70,12 +61,10 @@ class SegGen:
         norm_ctrs2 += off2
 
         # offset the object
-        # todo: maybe centering is not necessary?
         obj2_off = self.shift_object(obj2, obj2_roi, off2)
 
         # find the closest point between the contours
         # right now just finds the closest point for the first point of the src contour
-        # todo: maybe could change it to find the actual closest point
         pt1 = self.norm_ctrs1[0][0]
         d_min = 999999999
         i_min = 0
@@ -105,5 +94,3 @@ class SegGen:
         # generate the final image
         img = np.bitwise_or(np.bitwise_and(np.bitwise_not(self.mask1), self.img1), np.bitwise_and(obj2_warped, self.mask1))
         return img
-
-
