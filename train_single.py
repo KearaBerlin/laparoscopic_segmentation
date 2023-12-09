@@ -80,8 +80,10 @@ def tb_log(epoch, writer, names, metrics):
 weights = np.zeros(cfg.num_classes, dtype=np.float32)
 
 multilabel = "multilabel" in cfg.data_dir
+print(f"multilabel? {multilabel}")
 
 for x in os.walk(cfg.data_dir):
+    print(f"x0 = {x[0]}")
     val = False
     test = False
 
@@ -90,16 +92,21 @@ for x in os.walk(cfg.data_dir):
         if not "03" in x[0] and not "04" in x[0] and not "05" in x[0]:
             continue
 
-    if cfg.organ in x[0]:
+    if multilabel:
+        c_lbl = 1
+    elif cfg.organ in x[0]:
+        print("organ in fodler")
         c_lbl = 1
     else:
         continue
 
     if not os.path.isfile(x[0] + "/image00.png"):
+        print("no image00.png")
         continue
 
     for id in cfg.test_ids: #Skip test data
         if id in x[0]:
+            print("test id")
             test = True
             break
     if test:
@@ -112,9 +119,11 @@ for x in os.walk(cfg.data_dir):
 
     # Create dataloaders
     if val:
+        print("add to val dataset")
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.organ, cfg.num_classes, cfg.val_transform, image_size=cfg.image_size, k_aug=0.1)
         val_sets.append(dataset)
     else:
+        print("add to train dataset")
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.organ, cfg.num_classes, cfg.train_transform, image_size=cfg.image_size, k_aug=0.1)
         train_sets.append(dataset)
         #Collect frequencies for class weights
