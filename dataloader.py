@@ -54,7 +54,7 @@ class CobotLoaderBinary(Dataset):
                 gens[p[0]] = gen
             img = gen.generate(img_pair2[0], img_pair2[1])
 
-            mask_orig = cv2.imread(img_pair1[0], cv2.IMREAD_GRAYSCALE)
+            mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
     def __init__(self, root_dir, label, num_labels, transform, image_size=None, id=-1, create_negative_labels=False,
