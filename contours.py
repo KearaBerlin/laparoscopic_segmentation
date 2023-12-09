@@ -154,13 +154,13 @@ class Contour:
 
         for c in self.corners:
             while True:
-                p = self.contour[p_idx]
+                p = self.__contour[p_idx]
                 if np.array_equal(c[0], p[0]):
                     self.corner_map[c_idx] = p_idx
                     c_idx += 1
-                    p_idx = (p_idx + 1) % len(self.contour)
+                    p_idx = (p_idx + 1) % len(self.__contour)
                     break
-                p_idx = (p_idx + 1) % len(self.contour)
+                p_idx = (p_idx + 1) % len(self.__contour)
 
         assert c_idx == len(self.corners)
 
@@ -171,17 +171,17 @@ class Contour:
 
         for j_idx in range(1, len(self.corner_map)):
             j = self.corner_map[j_idx]
-            diff = j - i if j > i else len(self.contour) - i + j
+            diff = j - i if j > i else len(self.__contour) - i + j
             segments = round(diff / cnt_len_per_segment)
             if segments > 0:
                 segment_len = int(diff / segments)
                 for s in range(segments):
-                    result.append(self.contour[i])
+                    result.append(self.__contour[i])
                     i = (i + segment_len) % self.cnt_len
             i = j
         # add last corner
-        result.append(self.contour[i])
-        self.norm_contour = np.asarray(result)
+        result.append(self.__contour[i])
+        self.__norm_contour = np.asarray(result)
         pass
 
     def __init__(self, mask, num_pts=0):
@@ -189,29 +189,42 @@ class Contour:
         self.CORNER_APPROX_EPSILON = 8
         self.MAX_CONTOUR_PTS = 64
 
-        self.mask = mask
-        contours1, _ = cv2.findContours(cv2.cvtColor(self.mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
+        self.__mask = mask
+        contours1, _ = cv2.findContours(cv2.cvtColor(self.__mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
                                         cv2.CHAIN_APPROX_NONE)
-        self.contour = contours1[0]
-        self._rect = cv2.boundingRect(self.contour)
+        self.__contour = contours1[0]
+        self.corners = cv2.approxPolyDP(self.__contour, self.CORNER_APPROX_EPSILON, True)
+        self.cnt_len = len(self.__contour) + 1 # because it's in pixels
 
-        # offset is (x_off, y_off)
-        self._offset = (int(self.mask.shape[1] / 2 - (self._rect[0] + self._rect[2] / 2)),
-                        int(self.mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
-
-        self.corners = cv2.approxPolyDP(self.contour, self.CORNER_APPROX_EPSILON, True)
-        self.cnt_len = len(self.contour) + 1 # because it's in pixels
-
-        # map the corners back into the contour
+        # map the corners back into the contour and normalize
         self.__map_corners()
         self.__norm_contour(num_pts if num_pts > 0 else self.MAX_CONTOUR_PTS)
 
-        self.cnt_off = self.contour + self._offset
+        # recompute the mask based on the normalized contour
+        self.norm_mask = np.zeros_like(self.__mask)
+        norm_ctrs1 = self.__norm_contour[:, 0, :].astype(int)
+        # probably can just re-arrange it here
+        n1 = np.empty(tuple([1]) + norm_ctrs1.shape, dtype=int)
+        n1[0] = norm_ctrs1
+        cv2.drawContours(self.norm_mask, tuple(n1), -1, color=(255, 255, 255), thickness=cv2.FILLED)
+
+        # offset is (x_off, y_off)
+        self._rect = cv2.boundingRect(self.__contour)
+        self._offset = (int(self.__mask.shape[1] / 2 - (self._rect[0] + self._rect[2] / 2)),
+                        int(self.__mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
+
+        self.cnt_off = self.__contour + self._offset
         self.corn_off = self.corners + self._offset
-        self.norm_contour = self.norm_contour + self._offset
+        self.__norm_contour = self.__norm_contour + self._offset
+
+    def mask(self):
+        return self.__mask
+
+    def contour(self):
+        return self.__contour
 
     def num_pts(self):
-        return len(self.norm_contour)
+        return len(self.__norm_contour)
 
     def offset(self):
         return self._offset
