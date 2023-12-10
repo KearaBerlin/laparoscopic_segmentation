@@ -14,12 +14,16 @@ class SegGen2:
 
     # given an object (image), region of interest (rect) and offset
     # return new image containing the rect shifted by offset
-    def shift_object(self, obj, obj_roi, off):
+    def __shift_object(self, obj, obj_roi, off):
         obj_off = np.zeros_like(obj)
         (x, y, w, h) = (obj_roi[0], obj_roi[1], obj_roi[2], obj_roi[3])
         (x_o, y_o) = (obj_roi[0] + off[0], obj_roi[1] + off[1])
         obj_off[y_o:y_o + h, x_o:x_o + w] = obj[y:y + h, x:x + w]
         return obj_off
+
+    def __debug_show(self, img):
+        cv2.namedWindow("debug3", cv2.WINDOW_NORMAL)
+        cv2.imshow("debug3", img)
 
     def __debug(self, contour2, obj2_off):
         ######################################################
@@ -37,8 +41,8 @@ class SegGen2:
         t2 = tuple(n2)
 
         debug_i2 = np.copy(obj2_off)
-        obj1_off = self.shift_object(np.bitwise_and(self.img1, self.contour.norm_mask()),
-                                     self.contour.roi(), self.contour.offset())
+        obj1_off = self.__shift_object(np.bitwise_and(self.img1, self.contour.norm_mask()),
+                                       self.contour.roi(), self.contour.offset())
         debug_i1 = np.copy(obj1_off)
 
         cv2.drawContours(debug_i1, t1, 0, (0, 255, 255), 1)
@@ -51,14 +55,17 @@ class SegGen2:
         cv2.imshow("debug1", debug_i1)
         cv2.imshow("debug2", debug_i2)
 
+    def __generate_obj2(self, img2, contour2):
+        # create the object used for the transformation
+        obj2 = np.bitwise_and(img2, contour2.norm_mask())
+        obj2_off = self.__shift_object(obj2, contour2.roi(), contour2.offset())
+        return obj2_off
+
     def generate(self, image_file_name, mask_file_name):
         img2 = cv2.imread(image_file_name)
         mask2 = cv2.imread(mask_file_name)
         contour2 = Contour(mask2, self.contour.num_pts())
-        obj2 = np.bitwise_and(img2, contour2.norm_mask())
-
-        # offset the object
-        obj2_off = self.shift_object(obj2, contour2.roi(), contour2.offset())
+        obj2_off = self.__generate_obj2(img2, contour2)
 
         # reshaped contours, necessary for the transformer
         norm_ctrs1_r = self.contour.contour()[:, 0, :].reshape(1, -1, 2).astype(np.float32)
@@ -77,10 +84,20 @@ class SegGen2:
         obj1_roi = self.contour.roi()
         off1 = self.contour.offset()
         roi_off = (obj1_roi[0] + off1[0], obj1_roi[1] + off1[1], obj1_roi[2], obj1_roi[3])
-        obj2_warped = self.shift_object(obj2_p, roi_off, np.negative(off1))
+        obj2_warped = self.__shift_object(obj2_p, roi_off, np.negative(off1))
+
+        # recompute the mask for the warped object
+        obj2_contour = Contour.find_contours(obj2_warped)
+        obj2_mask = contour2.redraw_mask(obj2_contour)
+        # shrink mask by a couple pixels
+        dist = cv2.distanceTransform(np.bitwise_not(cv2.cvtColor(obj2_mask, cv2.COLOR_BGR2GRAY)), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+        ring = cv2.inRange(dist, 2, 3)  # take all pixels at distance between
+        contours, _ = cv2.findContours(ring, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        obj2_contour = contours[2]
+        obj2_mask = contour2.redraw_mask(obj2_contour)
 
         # generate the final image
-        img = np.bitwise_or(np.bitwise_and(np.bitwise_not(self.contour.norm_mask()), self.img1),
-                            np.bitwise_and(obj2_warped, self.contour.norm_mask()))
+        img = np.bitwise_or(np.bitwise_and(np.bitwise_not(obj2_mask), self.img1), obj2_warped)
+                            #np.bitwise_and(obj2_warped, self.contour.norm_mask()))
         return img
 

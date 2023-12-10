@@ -157,18 +157,29 @@ class Contour:
         img_corners = img_corners[::-1]
         corners = list()
 
-        # find the corner closest to 0, 0
+        # find the corner points closest to corners
+        l = len(self._contour)
+        start = 0
+        end = l - 1
         for pt1 in img_corners:
             d_min = 999999999
-            pt_min = 0
-            for pt2 in self._contour:
-                d = np.linalg.norm(pt1 - pt2[0])
+            i = start
+            i_min = 0
+            while i != end:
+                pt2 = self._contour[i][0]
+                d = np.subtract(pt1, pt2)
+                d = np.linalg.norm(d)
                 if d_min > d:
                     d_min = d
-                    pt_min = pt2[0]
-            corners.append(pt_min)
+                    i_min = i
+                i = (i + 1) % l
+            corners.append(self._contour[i_min][0])
+            if start == 0 and i_min > 0:
+                end = i_min - 1
+            start = (i_min + 1) % l
         self._super_corners = np.asarray(corners)
-        pass
+
+        assert len(self._super_corners) == len(img_corners)
 
     def __map_corners(self, corners):
         self._corner_map = np.empty(len(corners), dtype=int)
@@ -205,9 +216,9 @@ class Contour:
         # add last corner
         result.append(self._contour[i])
         self._norm_contour = np.asarray(result)
-        pass
 
     def __normalize_contour2(self, num_pts):
+        assert num_pts % len(self._corner_map) == 0
         pts_per_corner = int(num_pts / len(self._corner_map))
 
         result = list()
@@ -223,7 +234,10 @@ class Contour:
             i = j
         self._norm_contour = np.asarray(result)
 
-    def __find_contours(self, mask):
+        assert len(self._norm_contour) == num_pts
+
+    @staticmethod
+    def find_contours(mask):
         contours, _ = cv2.findContours(cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_NONE)
         longest_contour = []
@@ -232,16 +246,24 @@ class Contour:
                 longest_contour = cnt
         return longest_contour
 
+    def redraw_mask(self, contour):
+        # redraw the mask based on the chosen contour
+        norm_mask = np.zeros_like(self._mask)
+        norm_ctr = contour[:, 0, :].astype(int)
+        n1 = np.empty(tuple([1]) + norm_ctr.shape, dtype=int)
+        n1[0] = norm_ctr
+        cv2.drawContours(norm_mask, tuple(n1), -1, color=(255, 255, 255), thickness=cv2.FILLED)
+        return norm_mask
+
     def __init__(self, mask, num_pts=0):
         # the higher the number, the rougher the corner estimation
         self.CORNER_APPROX_EPSILON = 8.0
-        self.MAX_CONTOUR_PTS = 64
+        self.MAX_CONTOUR_PTS = 96
 
         self._mask = mask
-        self._contour = self.__find_contours(mask)
+        self._contour = Contour.find_contours(mask)
         self._corners = np.empty(0)
 
-        eps = self.CORNER_APPROX_EPSILON
         self._corners = cv2.approxPolyDP(self._contour, self.CORNER_APPROX_EPSILON, True)
 
         self._cnt_len = len(self._contour) + 1  # because it's in pixels
@@ -251,13 +273,8 @@ class Contour:
         self.__map_corners(self._super_corners)
         self.__normalize_contour2(num_pts if num_pts > 0 else self.MAX_CONTOUR_PTS)
 
-        # recompute the mask based on the normalized contour
-        self._norm_mask = np.zeros_like(self._mask)
-        norm_ctrs1 = self._norm_contour[:, 0, :].astype(int)
-        # probably can just re-arrange it here
-        n1 = np.empty(tuple([1]) + norm_ctrs1.shape, dtype=int)
-        n1[0] = norm_ctrs1
-        cv2.drawContours(self._norm_mask, tuple(n1), -1, color=(255, 255, 255), thickness=cv2.FILLED)
+        # redraw the mask based on the chosen contour
+        self._norm_mask = self.redraw_mask(self._contour)
 
         # offset is (x_off, y_off)
         # self._rect = cv2.boundingRect(self.__contour)
