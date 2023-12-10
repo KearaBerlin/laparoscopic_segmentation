@@ -2,21 +2,25 @@ from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 from transformers import SegformerForSemanticSegmentation
 from torchvision import models
 import torch
-import dataloader
-import os
+from torch.utils.tensorboard import SummaryWriter
+from torcheval.metrics import BinaryAccuracy, BinaryF1Score, BinaryPrecision, BinaryRecall
+from torchmetrics import JaccardIndex
 import torch.nn as nn
 import torch.optim as optim
 import torch.cuda.amp
+
+import dataloader
+import os
+import datetime
+
 import numpy as np
 import sys
 import albumentations as A
 import albumentations.augmentations.functional as F
 from albumentations.pytorch import ToTensorV2
+
 from models import UNet11
 import argparse
-from torch.utils.tensorboard import SummaryWriter
-from torcheval.metrics import BinaryAccuracy, BinaryF1Score, BinaryPrecision, BinaryRecall
-from torchmetrics import JaccardIndex
 import importlib.util
 
 debug = False
@@ -35,7 +39,11 @@ sys.modules[config_namespace] = config
 spec.loader.exec_module(config)
 cfg = config.Config()
 
-log_file = open(os.path.join(cfg.output_folder, "log.txt"), "w")
+output_folder = f"{cfg.output_folder}_{datetime.now.strftime('%m-%d-%Y_%H:%M')}"
+if not os.path.exists(output_folder):
+    os.mkdir(output_folder)
+
+log_file = open(os.path.join(output_folder, "log.txt"), "w")
 def log(s):
 	print(s)
 	log_file.write(s+"\n")
@@ -116,7 +124,7 @@ for x in os.walk(cfg.data_dir):
     else:
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.train_transform, 
                                                image_size=cfg.image_size, 
-                                               aug_method=cfg.aug, k_aug=cfg.k)
+                                               aug_method=cfg.aug, k_aug=cfg.k, seed=cfg.seed)
         train_sets.append(dataset)
         #Collect frequencies for class weights
         bg_w, p = dataset.get_frequency()
