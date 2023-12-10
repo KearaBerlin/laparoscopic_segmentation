@@ -16,8 +16,8 @@ class Config():
     SEGFORMER = False
     UNET = False
 
-    AUG_ID = 0 # none
-    K = 0.1
+    AUG_ID = 1 # none
+    K = 0.2
     AUGS = ["none", "rand_pair"]
     SEED = True
 

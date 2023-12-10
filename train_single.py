@@ -11,7 +11,7 @@ import torch.cuda.amp
 
 import dataloader
 import os
-import datetime
+from datetime import datetime
 
 import numpy as np
 import sys
@@ -39,9 +39,13 @@ sys.modules[config_namespace] = config
 spec.loader.exec_module(config)
 cfg = config.Config()
 
-output_folder = f"{cfg.output_folder}_{datetime.now.strftime('%m-%d-%Y_%H:%M')}"
+output_folder = os.path.join(
+    cfg.output_folder,
+    "outputs",
+    f"{datetime.now().strftime('%m-%d-%Y_%H:%M')}"
+)
 if not os.path.exists(output_folder):
-    os.mkdir(output_folder)
+    os.makedirs(output_folder)
 
 log_file = open(os.path.join(output_folder, "log.txt"), "w")
 def log(s):
@@ -272,14 +276,14 @@ for e in range(cfg.epochs):
     scheduler.step()
 
     if (e + 1) % 10 == 0:
-        torch.save(model.state_dict(), os.path.join(cfg.output_folder, "model%04d.th" % e))
+        torch.save(model.state_dict(), os.path.join(output_folder, "model%04d.th" % e))
         log(f"Epoch {e}: val loss: {metrics[1]} jac: {pytorch_metric_vals['jaccard']}")
 
 
     if best_f1 < pytorch_metric_vals['f1']:
         best_epoch = e
         best_f1 = pytorch_metric_vals['f1']
-        torch.save(model.state_dict(), os.path.join(cfg.output_folder, "model_best.th"))
+        torch.save(model.state_dict(), os.path.join(output_folder, "model_best.th"))
 
 log_file.write(f"Best f1: {best_f1} (epoch {best_epoch})")
 log_file.flush()
