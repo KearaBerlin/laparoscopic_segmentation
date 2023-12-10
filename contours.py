@@ -218,10 +218,19 @@ class Contour:
             diff = j - i if j > i else len(self._contour) - i + j
             segment_len = int(diff / pts_per_corner)
             for k in range(pts_per_corner):
-                result.append(self._contour[i])
+                result.append(self._contour[i % len(self._contour)])
                 i = (i + segment_len) % self._cnt_len
             i = j
         self._norm_contour = np.asarray(result)
+
+    def __find_contours(self, mask):
+        contours, _ = cv2.findContours(cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
+                                       cv2.CHAIN_APPROX_NONE)
+        longest_contour = []
+        for cnt in contours:
+            if len(cnt) > len(longest_contour):
+                longest_contour = cnt
+        return longest_contour
 
     def __init__(self, mask, num_pts=0):
         # the higher the number, the rougher the corner estimation
@@ -229,9 +238,7 @@ class Contour:
         self.MAX_CONTOUR_PTS = 64
 
         self._mask = mask
-        contours1, _ = cv2.findContours(cv2.cvtColor(self._mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
-                                        cv2.CHAIN_APPROX_NONE)
-        self._contour = contours1[0]
+        self._contour = self.__find_contours(mask)
         self._corners = np.empty(0)
 
         eps = self.CORNER_APPROX_EPSILON

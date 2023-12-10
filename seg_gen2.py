@@ -21,33 +21,7 @@ class SegGen2:
         obj_off[y_o:y_o + h, x_o:x_o + w] = obj[y:y + h, x:x + w]
         return obj_off
 
-    def generate(self, image_file_name, mask_file_name):
-        img2 = cv2.imread(image_file_name)
-        mask2 = cv2.imread(mask_file_name)
-        contour2 = Contour(mask2, self.contour.num_pts())
-        obj2 = np.bitwise_and(img2, contour2.norm_mask())
-
-        # offset the object
-        # todo: maybe centering is not necessary?
-        obj2_off = self.shift_object(obj2, contour2.roi(), contour2.offset())
-
-        # matched = self.contour.est_match_points(contour2)
-        # reshaped contours, necessary for the transformer
-        #norm_ctrs1_r = matched[:, 0, :].reshape(1, -1, 2).astype(np.float32)
-        #norm_ctrs2_r = matched[:, 1, :].reshape(1, -1, 2).astype(np.float32)
-        norm_ctrs1_r = self.contour.contour()[:, 0, :].reshape(1, -1, 2).astype(np.float32)
-        norm_ctrs2_r = contour2.contour()[:, 0, :].reshape(1, -1, 2).astype(np.float32)
-
-        # pt1 = self.contour.contour()[0]
-        # d_min = 999999999
-        # i_min = 0
-        # for i in range(contour2.num_pts()):
-        #     pt2 = contour2.contour()[i][0]
-        #     d = np.linalg.norm(pt1 - pt2)
-        #     if d_min > d:
-        #         d_min = d
-        #         i_min = i
-
+    def __debug(self, contour2, obj2_off):
         ######################################################
         cv2.namedWindow("debug1", cv2.WINDOW_NORMAL)
         cv2.namedWindow("debug2", cv2.WINDOW_NORMAL)
@@ -76,19 +50,28 @@ class SegGen2:
 
         cv2.imshow("debug1", debug_i1)
         cv2.imshow("debug2", debug_i2)
-        ######################################################
+
+    def generate(self, image_file_name, mask_file_name):
+        img2 = cv2.imread(image_file_name)
+        mask2 = cv2.imread(mask_file_name)
+        contour2 = Contour(mask2, self.contour.num_pts())
+        obj2 = np.bitwise_and(img2, contour2.norm_mask())
+
+        # offset the object
+        obj2_off = self.shift_object(obj2, contour2.roi(), contour2.offset())
+
+        # reshaped contours, necessary for the transformer
+        norm_ctrs1_r = self.contour.contour()[:, 0, :].reshape(1, -1, 2).astype(np.float32)
+        norm_ctrs2_r = contour2.contour()[:, 0, :].reshape(1, -1, 2).astype(np.float32)
 
         matches = list()
         for i in range(self.contour.num_pts()):
-            #matches.append(cv2.DMatch(i, (i_min + i) % contour2.num_pts(), 0))
             matches.append(cv2.DMatch(i, i, 0))
 
         # estimate the transform
         tps = cv2.createThinPlateSplineShapeTransformer()
         tps.estimateTransformation(norm_ctrs1_r, norm_ctrs2_r, matches)
         obj2_p = tps.warpImage(obj2_off)
-
-        #cv2.imshow("debug2", obj2_p)
 
         # shift the warped object back, using obj1's shifted roi
         obj1_roi = self.contour.roi()
@@ -100,5 +83,4 @@ class SegGen2:
         img = np.bitwise_or(np.bitwise_and(np.bitwise_not(self.contour.norm_mask()), self.img1),
                             np.bitwise_and(obj2_warped, self.contour.norm_mask()))
         return img
-
 

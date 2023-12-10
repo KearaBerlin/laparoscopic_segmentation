@@ -14,6 +14,7 @@ import albumentations
 import multiprocessing
 
 from seg_gen import SegGen
+from seg_gen2 import SegGen2
 
 
 class CobotLoaderBinary(Dataset):
@@ -37,12 +38,12 @@ class CobotLoaderBinary(Dataset):
 
     def __generate_aug(self, k):
         assert 0 <= k <= 1.0
-        #rng = random.Random(42)
+        rng = random.Random(42)
 
         num = len(self.files)
         k_num = num * k
         perms = list(itertools.permutations(range(num), 2))
-        pairs = random.sample(perms, int(k_num * k_num))
+        pairs = rng.sample(perms, int(k_num * k_num))
         gens = dict()
 
         for p in pairs:
@@ -50,9 +51,11 @@ class CobotLoaderBinary(Dataset):
             img_pair1 = self.files[p[0]]
             img_pair2 = self.files[p[1]]
             if gen is None:
-                gen = SegGen(img_pair1[0], img_pair1[1])
+                gen = SegGen2(img_pair1[0], img_pair1[1])
                 gens[p[0]] = gen
             img = gen.generate(img_pair2[0], img_pair2[1])
+            #fname = img_pair1[0].split("\\")[-1] + "_" + img_pair2[1].split("\\")[-1]
+            #cv2.imwrite("f:/temp/aug/" + fname, img)
 
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
