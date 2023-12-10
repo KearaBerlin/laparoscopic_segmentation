@@ -37,12 +37,12 @@ class CobotLoaderBinary(Dataset):
 
     def __generate_aug(self, k):
         assert 0 <= k <= 1.0
-        rng = random.Random(42)
+        #rng = random.Random(42)
 
         num = len(self.files)
         k_num = num * k
         perms = list(itertools.permutations(range(num), 2))
-        pairs = rng.sample(perms, int(k_num * k_num))
+        pairs = random.sample(perms, int(k_num * k_num))
         gens = dict()
 
         for p in pairs:
@@ -57,8 +57,9 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
-    def __init__(self, root_dir, label, num_labels, transform, image_size=None, id=-1, create_negative_labels=False,
-                 k_aug=0.0):
+    def __init__(self, root_dir, label, num_labels, transform, 
+                 image_size=None, id=-1, create_negative_labels=False,
+                 aug_method="none", k_aug=0.0):
 
         self.root_dir = root_dir
         self.images = []
@@ -90,7 +91,7 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
-        if k_aug > 0:
+        if k_aug > 0 and aug_method == "rand_pair":
             self.__generate_aug(k_aug)
 
     def get_frequency(self):
