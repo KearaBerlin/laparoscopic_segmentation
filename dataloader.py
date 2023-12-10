@@ -57,8 +57,9 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
-    def __init__(self, root_dir, label, num_labels, transform, image_size=None, id=-1, create_negative_labels=False,
-                 k_aug=0.0):
+    def __init__(self, root_dir, label, num_labels, transform, 
+                 image_size=None, id=-1, create_negative_labels=False,
+                 aug_method="none", k_aug=0.0):
 
         self.root_dir = root_dir
         self.images = []
@@ -90,7 +91,7 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
-        if k_aug > 0:
+        if k_aug > 0 and aug_method == "rand_pair":
             self.__generate_aug(k_aug)
 
     def get_frequency(self):
