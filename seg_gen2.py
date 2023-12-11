@@ -25,6 +25,13 @@ class SegGen2:
         cv2.namedWindow("debug3", cv2.WINDOW_NORMAL)
         cv2.imshow("debug3", img)
 
+    def __draw_contour(self, img, contour, color=(255, 255, 255)):
+        ctr_r = contour[:, 0, :].astype(int)
+        n1 = np.empty(tuple([1]) + ctr_r.shape, dtype=int)
+        n1[0] = ctr_r
+        t1 = tuple(n1)
+        cv2.drawContours(img, t1, 0, color, 1)
+
     def __debug(self, contour2, obj2_off):
         ######################################################
         cv2.namedWindow("debug1", cv2.WINDOW_NORMAL)
@@ -87,17 +94,22 @@ class SegGen2:
         obj2_warped = self.__shift_object(obj2_p, roi_off, np.negative(off1))
 
         # recompute the mask for the warped object
-        obj2_contour = Contour.find_contours(obj2_warped)
-        obj2_mask = contour2.redraw_mask(obj2_contour)
-        # shrink mask by a couple pixels
-        dist = cv2.distanceTransform(np.bitwise_not(cv2.cvtColor(obj2_mask, cv2.COLOR_BGR2GRAY)), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-        ring = cv2.inRange(dist, 2, 3)  # take all pixels at distance between
-        contours, _ = cv2.findContours(ring, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        obj2_contour = contours[2]
-        obj2_mask = contour2.redraw_mask(obj2_contour)
+        obj2_warped = np.bitwise_and(obj2_warped, self.mask1)
+        obj2_contour = Contour.find_contours(obj2_warped, cv2.CHAIN_APPROX_TC89_L1)
+        obj2_contour_img = np.zeros_like(self.mask1)
+        self.__draw_contour(obj2_contour_img, obj2_contour)
+
+        # # shrink mask by a couple pixels
+        dist = cv2.distanceTransform(np.bitwise_not(cv2.cvtColor(obj2_contour_img, cv2.COLOR_BGR2GRAY)), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+        ring = cv2.inRange(dist, 3, 4)  # take all pixels at distance between
+        contours, h = cv2.findContours(ring, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_L1)
+        cont_list = list(contours)
+        cont_list.sort(key=lambda ctr: len(ctr))
+        obj2_contour2 = cont_list[-3]
+        obj2_mask2 = contour2.redraw_mask(obj2_contour2)
 
         # generate the final image
-        img = np.bitwise_or(np.bitwise_and(np.bitwise_not(obj2_mask), self.img1), obj2_warped)
-                            #np.bitwise_and(obj2_warped, self.contour.norm_mask()))
+        img = np.bitwise_or(np.bitwise_and(np.bitwise_not(obj2_mask2), self.img1),
+                            np.bitwise_and(obj2_warped, obj2_mask2))
         return img
 

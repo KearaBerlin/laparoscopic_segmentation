@@ -157,7 +157,7 @@ class Contour:
         img_corners = img_corners[::-1]
         corners = list()
 
-        # find the corner points closest to corners
+        # find the contour points closest to corners
         l = len(self._contour)
         start = 0
         end = l - 1
@@ -237,9 +237,8 @@ class Contour:
         assert len(self._norm_contour) == num_pts
 
     @staticmethod
-    def find_contours(mask):
-        contours, _ = cv2.findContours(cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL,
-                                       cv2.CHAIN_APPROX_NONE)
+    def find_contours(mask, type=cv2.CHAIN_APPROX_NONE):
+        contours, _ = cv2.findContours(cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL, type)
         longest_contour = []
         for cnt in contours:
             if len(cnt) > len(longest_contour):
