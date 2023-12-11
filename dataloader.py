@@ -38,7 +38,7 @@ class CobotLoaderBinary(Dataset):
     def __generate_aug(self, k, seed=False):
         assert 0 <= k <= 1.0
 
-        num = len(self.files)
+        num = len(self.organ_ii)
         k_num = num * k
         perms = list(itertools.permutations(range(num), 2))
         pairs = random.sample(perms, int(k_num * k_num))
@@ -48,9 +48,13 @@ class CobotLoaderBinary(Dataset):
         gens = dict()
 
         for p in pairs:
-            gen = gens.get(p[0])
-            img_pair1 = self.files[p[0]]
-            img_pair2 = self.files[p[1]]
+            i_0 = self.organ_ii[p[0]]
+            i_1 = self.organ_ii[p[1]]
+
+            gen = gens.get(i_0)
+            img_pair1 = self.files[i_0]
+            img_pair2 = self.files[i_1]
+            
             if gen is None:
                 gen = SegGen(img_pair1[0], img_pair1[1])
                 gens[p[0]] = gen
@@ -61,6 +65,7 @@ class CobotLoaderBinary(Dataset):
 
     def __init__(self, root_dir, label, num_labels, transform, 
                  image_size=None, id=-1, create_negative_labels=False,
+                 organ_name=None,
                  aug_method="none", k_aug=0.0, seed=False):
 
         self.root_dir = root_dir
@@ -86,13 +91,19 @@ class CobotLoaderBinary(Dataset):
         for file in os.listdir(self.root_dir):
             if "png" in file and file[0:5] == "image":
                 file = os.path.join(self.root_dir, file)
-                mask_filename = file.replace("image", "mask").replace(".png", f"_{organ_name}.png")
+                mask_filename = file.replace("image", "mask")
+                if self.organ_name is not None:
+                    mask_filename = mask_filename.replace(".png", f"_{organ_name}.png")
                 self.files.append((file, mask_filename))
 
-        for file, mask_file in self.files:
+        self.organ_ii = []
+        for i, (file, mask_file) in enumerate(self.files):
             img = cv2.imread(file)
             mask_orig = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
+            # keep track of images with the given organ in them 
+            if organ_name is not None and np.sum(mask_orig) > 0:
+                self.organ_ii.append(i)
 
         if k_aug > 0 and aug_method == "rand_pair":
             self.__generate_aug(k_aug, seed)
