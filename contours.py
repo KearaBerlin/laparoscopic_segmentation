@@ -181,6 +181,30 @@ class Contour:
 
         assert len(self._super_corners) == len(img_corners)
 
+    def __find_super_corners_slow(self):
+        img_corners = [[0, 0], [self._mask.shape[0] / 2, 0], [self._mask.shape[0], 0],
+                       [self._mask.shape[0], self._mask.shape[1] / 2], [self._mask.shape[0], self._mask.shape[1]],
+                       [self._mask.shape[0] / 2, self._mask.shape[1]], [0, self._mask.shape[1]],
+                       [0, self._mask.shape[1] / 2]]
+
+        # looks like contours go in the opposite direction
+        img_corners = img_corners[::-1]
+        corners = list()
+
+        # find the contour points closest to corners
+        for pt1 in img_corners:
+            d_min = 999999999
+            pt_min = []
+            for pt2 in self._contour:
+                d = np.linalg.norm(np.subtract(pt1, pt2[0]))
+                if d_min > d:
+                    d_min = d
+                    pt_min = pt2[0]
+            corners.append(pt_min)
+
+        self._super_corners = np.asarray(corners)
+        assert len(self._super_corners) == len(img_corners)
+
     def __map_corners(self, corners):
         self._corner_map = np.empty(len(corners), dtype=int)
         p_idx = 0
@@ -269,6 +293,7 @@ class Contour:
 
         # map the corners back into the contour and normalize
         self.__find_super_corners()
+        #self.__find_super_corners_slow()
         self.__map_corners(self._super_corners)
         self.__normalize_contour2(num_pts if num_pts > 0 else self.MAX_CONTOUR_PTS)
 
