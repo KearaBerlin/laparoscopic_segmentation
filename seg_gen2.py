@@ -95,6 +95,7 @@ class SegGen2:
         roi_off = (obj1_roi[0] + off1[0], obj1_roi[1] + off1[1], obj1_roi[2], obj1_roi[3])
         obj2_warped = self.__shift_object(obj2_p, roi_off, np.negative(off1))
 
+
         # recompute the mask for the warped object
         obj2_warped = np.bitwise_and(obj2_warped, self.mask1)
         obj2_contour = Contour.find_contours(obj2_warped, cv2.CHAIN_APPROX_TC89_L1)
