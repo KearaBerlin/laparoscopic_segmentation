@@ -116,14 +116,13 @@ class SegGen2:
 
         # # shrink mask by a couple pixels
         dist = cv2.distanceTransform(np.bitwise_not(cv2.cvtColor(obj2_contour_img, cv2.COLOR_BGR2GRAY)), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-        ring = cv2.inRange(dist, 2, 4)  # take all pixels at distance between
+        ring = cv2.inRange(dist, 3, 4)  # take all pixels at distance between
         contours, h_tree = cv2.findContours(ring, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
-        sel = (-1, -1)
         for h in range(len(h_tree[0])):
-             if h_tree[0][h][2] == -1 and h_tree[0][h][3] != -1:
-                 if len(contours[h]) > sel[1]:
-                     sel = (h, len(contours[h]))
-        obj2_contour2 = contours[sel[0]]
+            if h_tree[0][h][2] == -1 and h_tree[0][h][3] != -1:
+                break
+
+        obj2_contour2 = contours[h]
         obj2_mask2 = contour2.redraw_mask(obj2_contour2)
 
         # generate the final image
