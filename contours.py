@@ -253,6 +253,7 @@ class Contour:
 
         for c in corners:
             while True:
+
                 p = self._cnt_off[p_idx]
                 if np.array_equal(c, p[0]):
                     self._corner_map[c_idx] = p_idx
@@ -268,18 +269,16 @@ class Contour:
         result = list()
         i = self._corner_map[0]
 
-        for j_idx in range(1, len(self._corner_map)):
-            j = self._corner_map[j_idx]
-            diff = j - i if j > i else len(self._contour) - i + j
+        for j_idx in range(1, len(self._corner_map) + 1):
+            j = self._corner_map[j_idx % len(self._corner_map)]
+            diff = j - i if j > i else self._cnt_len - i + j
             segments = round(diff / cnt_len_per_segment)
             if segments > 0:
-                segment_len = int(diff / segments)
+                segment_len = diff / segments
                 for s in range(segments):
-                    result.append(self._contour[i])
-                    i = (i + segment_len) % self._cnt_len
+                    k = (i + int(s * segment_len)) % self._cnt_len
+                    result.append(self._contour[k])
             i = j
-        # add last corner
-        result.append(self._contour[i])
         self._norm_contour = np.asarray(result)
 
     def __normalize_contour2(self, num_pts):
@@ -291,6 +290,7 @@ class Contour:
 
         for j_idx in range(1, len(self._corner_map) + 1):
             j = self._corner_map[j_idx % len(self._corner_map)]
+
             diff = j - i if j > i else len(self._cnt_off) - i + j
             segment_len = int(diff / pts_per_corner)
             for k in range(pts_per_corner):
@@ -298,8 +298,35 @@ class Contour:
                 i = (i + segment_len) % self._cnt_len
             i = j
         self._norm_contour = np.asarray(result)
-
         assert len(self._norm_contour) == num_pts
+
+    def __normalize_contour3(self, other: "Contour"):
+        # match my corners to the other counter's corners
+        # then divide each segment to match the # points for each pair of matched corners
+        result = dict()
+        j_max = -1
+
+        for i in range(len(self._corn_off)):
+            pt1 = self._corn_off[i]
+            d_min = 999999999
+            j_min = 0
+            for j in range(len(other._corn_off)):
+                pt2 = other._corn_off[j]
+                d = np.linalg.norm(np.subtract(pt1, pt2))
+                if d_min > d:
+                    d_min = d
+                    j_min = j
+
+            if (result.get(j_min) is not None) and (result[j_min][1] < d_min or (j_min < j_max)):
+                continue
+
+            j_max = j_min
+            result[j_min] = (i, d_min)
+
+        # result now has for a map from corner (idx) of the other contour to closest corner (idx) on my contour
+
+
+        assert len(self._norm_contour) == other.num_pts()
 
     @staticmethod
     def find_contours(mask, type=cv2.CHAIN_APPROX_NONE):
@@ -319,14 +346,12 @@ class Contour:
         cv2.drawContours(norm_mask, tuple(n1), -1, color=(255, 255, 255), thickness=cv2.FILLED)
         return norm_mask
 
-    def __init__(self, mask, num_pts=0):
+    def __init__(self, mask, other: "Contour" = None):
         # the higher the number, the rougher the corner estimation
         self.CORNER_APPROX_EPSILON = 8.0
 
         self._mask = mask
         self._contour = Contour.find_contours(mask)
-        self._corners = np.empty(0)
-
         self._corners = cv2.approxPolyDP(self._contour, self.CORNER_APPROX_EPSILON, True)
 
         self._cnt_len = len(self._contour)

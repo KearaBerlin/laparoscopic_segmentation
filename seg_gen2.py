@@ -73,7 +73,7 @@ class SegGen2:
     def generate(self, image_file_name, mask_file_name):
         img2 = cv2.imread(image_file_name)
         mask2 = cv2.imread(mask_file_name)
-        contour2 = Contour(mask2, self.contour.num_pts())
+        contour2 = Contour(mask2, self.contour)
         obj2_off = self.__generate_obj2(img2, contour2)
 
         # reshaped contours, necessary for the transformer
