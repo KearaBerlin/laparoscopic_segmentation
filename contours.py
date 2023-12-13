@@ -253,7 +253,6 @@ class Contour:
 
         for c in corners:
             while True:
-
                 p = self._cnt_off[p_idx]
                 if np.array_equal(c, p[0]):
                     self._corner_map[c_idx] = p_idx
@@ -290,11 +289,10 @@ class Contour:
 
         for j_idx in range(1, len(self._corner_map) + 1):
             j = self._corner_map[j_idx % len(self._corner_map)]
-
             diff = j - i if j > i else len(self._cnt_off) - i + j
             segment_len = int(diff / pts_per_corner)
             for k in range(pts_per_corner):
-                result.append(self._cnt_off[i % self._cnt_len])
+                result.append(self._contour[i % self._cnt_len])
                 i = (i + segment_len) % self._cnt_len
             i = j
         self._norm_contour = np.asarray(result)
@@ -353,13 +351,15 @@ class Contour:
         self._mask = mask
         self._contour = Contour.find_contours(mask)
         self._corners = cv2.approxPolyDP(self._contour, self.CORNER_APPROX_EPSILON, True)
+        self._cnt_len = len(self._contour) + 1  # because it's in pixels
 
-        self._cnt_len = len(self._contour)
+        # map the corners back into the contour and normalize
+        self.__find_super_corners()
+        self.__map_corners(self._corners)
 
         self._rect = cv2.boundingRect(self._contour)
         self._offset = (int(self._mask.shape[1] / 2 - (self._rect[0] + self._rect[2] / 2)),
                         int(self._mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
-
         self._cnt_off = self._contour + self._offset
         self._corn_off = self._corners + self._offset
 
