@@ -54,8 +54,9 @@ class CobotLoaderBinary(Dataset):
                 gen = SegGen2(img_pair1[0], img_pair1[1])
                 gens[p[0]] = gen
             img = gen.generate(img_pair2[0], img_pair2[1])
-            #fname = img_pair1[0].split("\\")[-1] + "_" + img_pair2[1].split("\\")[-1]
-            #cv2.imwrite("f:/temp/aug/" + fname, img)
+
+            fname = img_pair1[0].split("\\")[-1] + "_" + img_pair2[1].split("\\")[-1]
+            cv2.imwrite("f:/temp/aug/" + fname, img)
 
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)

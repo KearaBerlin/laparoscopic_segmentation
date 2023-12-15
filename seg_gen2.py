@@ -56,8 +56,23 @@ class SegGen2:
         cv2.drawContours(debug_i2, t2, 0, (255, 0, 255), 1)
 
         for i in range(len(norm_ctrs1)):
-            debug_i1 = cv2.circle(debug_i1, norm_ctrs1[i], 5, color=(255 if i == 0 else 0, 255, 255), thickness=-1)
-            debug_i2 = cv2.circle(debug_i2, norm_ctrs2[i], 5, color=(255, 255 if i == 0 else 0, 255), thickness=-1)
+            debug_i1 = cv2.circle(debug_i1, norm_ctrs1[i], 5, color=(255, 255, 255), thickness=-1)
+            debug_i2 = cv2.circle(debug_i2, norm_ctrs2[i], 5, color=(255, 255, 255), thickness=-1)
+
+        for c in self.contour.corners():
+            debug_i1 = cv2.circle(debug_i1, c[0], 5, color=(255, 0, 0), thickness=-1)
+
+        for c in contour2.corners():
+            debug_i2 = cv2.circle(debug_i2, c[0], 5, color=(255, 0, 0), thickness=-1)
+
+        corner_map = list(contour2.match_corners_to_other(self.contour).items())
+        corner_map2 = list(self.contour.match_corners_to_other(contour2).items())
+
+        for m in corner_map:
+            i = m[0]
+            j = m[1][0]
+            debug_i1 = cv2.circle(debug_i1, self.contour.contour()[i][0], 5, color=(0, 0, 255), thickness=-1)
+            debug_i2 = cv2.circle(debug_i2, contour2.corners()[j][0], 5, color=(0, 0, 255), thickness=-1)
 
         cv2.imshow("debug1", debug_i1)
         cv2.imshow("debug2", debug_i2)
@@ -78,9 +93,12 @@ class SegGen2:
         norm_ctrs1_r = self.contour.contour()[:, 0, :].reshape(1, -1, 2).astype(np.float32)
         norm_ctrs2_r = contour2.contour()[:, 0, :].reshape(1, -1, 2).astype(np.float32)
 
-        matches = list()
-        for i in range(self.contour.num_pts()):
-            matches.append(cv2.DMatch(i, i, 0))
+        #matches = list()
+        #for i in range(self.contour.num_pts()):
+        #    matches.append(cv2.DMatch(i, i, 0))
+        matches = contour2.matches()
+
+        self.__debug(contour2, obj2_off)
 
         # estimate the transform
         tps = cv2.createThinPlateSplineShapeTransformer()
