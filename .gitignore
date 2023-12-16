@@ -2,3 +2,6 @@ __pycache__/
 venv/
 .idea/
 data
+runs
+Dresden
+Seg_*
