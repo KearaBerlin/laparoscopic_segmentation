@@ -11,7 +11,7 @@ import torch.cuda.amp
 
 import dataloader
 import os
-import datetime
+from _datetime import datetime
 
 import numpy as np
 import sys
@@ -151,7 +151,7 @@ writer.add_text("ConfigName", args.config_name, global_step=0)
 if cfg.unet:
     model = UNet11(num_classes=cfg.num_classes, pretrained=True)
 elif cfg.segformer:
-    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b3-finetuned-cityscapes-1024-1024",num_labels=num_classes,ignore_mismatched_sizes=True)
+    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b3-finetuned-cityscapes-1024-1024",num_labels=cfg.num_classes,ignore_mismatched_sizes=True)
 else:
     model = models.segmentation.deeplabv3_resnet50(pretrained=True, progress=True)
     model.classifier = DeepLabHead(2048, cfg.num_classes)
