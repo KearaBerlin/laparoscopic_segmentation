@@ -147,6 +147,48 @@ class ContourIterator:
 
 class Contour:
 
+    def __fix_super_corners(self):
+        # detect anomalies and fix them
+        l = len(self._corner_map)
+        avg = self._cnt_len / l
+        run = True
+
+        for j in range(len(self._corner_map)):
+            dist = []
+            delta = []
+            stop = True
+
+            for i in range(-1, len(self._corner_map)-1):
+                f = self._corner_map[i]
+                t = self._corner_map[i + 1]
+                dist.append(t - f if t > f else self._cnt_len - f + t)
+
+            for i in range(-1, len(dist)-1):
+                f = dist[i]
+                t = dist[i + 1]
+                delta.append(t - f)
+
+            for dir in [True, False]:
+                if dir:
+                    i_min = delta.index(max(delta)) - 1
+                else:
+                    i_min = delta.index(min(delta))
+
+                if dist[i_min] < avg / 7:
+                    prev_val = self._corner_map[i_min - 1]
+                    next_val = self._corner_map[(i_min + 1) % l]
+                    if next_val > prev_val:
+                        self._corner_map[i_min] = int((next_val + prev_val) / 2)
+                    else:
+                        self._corner_map[i_min] = (prev_val + (self._cnt_len - prev_val + next_val) / 2) % self._cnt_len
+
+                    stop = False
+                    break
+
+            if stop:
+                break
+
+
     def __find_super_corners(self):
         img_corners = [[0, 0], [self._mask.shape[0] / 2, 0], [self._mask.shape[0], 0],
                        [self._mask.shape[0], self._mask.shape[1] / 2], [self._mask.shape[0], self._mask.shape[1]],
@@ -158,7 +200,7 @@ class Contour:
         corners = list()
 
         # find the contour points closest to corners
-        l = len(self._contour)
+        l = len(self._cnt_off)
         start = 0
         end = l - 1
         for pt1 in img_corners:
@@ -166,14 +208,14 @@ class Contour:
             i = start
             i_min = 0
             while i != end:
-                pt2 = self._contour[i][0]
+                pt2 = self._cnt_off[i][0]
                 d = np.subtract(pt1, pt2)
                 d = np.linalg.norm(d)
                 if d_min > d:
                     d_min = d
                     i_min = i
                 i = (i + 1) % l
-            corners.append(self._contour[i_min][0])
+            corners.append(self._cnt_off[i_min][0])
             if start == 0 and i_min > 0:
                 end = i_min - 1
             start = (i_min + 1) % l
@@ -188,13 +230,13 @@ class Contour:
 
         for c in corners:
             while True:
-                p = self._contour[p_idx]
+                p = self._cnt_off[p_idx]
                 if np.array_equal(c, p[0]):
                     self._corner_map[c_idx] = p_idx
                     c_idx += 1
-                    p_idx = (p_idx + 1) % len(self._contour)
+                    p_idx = (p_idx + 1) % self._cnt_len
                     break
-                p_idx = (p_idx + 1) % len(self._contour)
+                p_idx = (p_idx + 1) % self._cnt_len
 
         assert c_idx == len(corners)
 
@@ -226,10 +268,10 @@ class Contour:
 
         for j_idx in range(1, len(self._corner_map) + 1):
             j = self._corner_map[j_idx % len(self._corner_map)]
-            diff = j - i if j > i else len(self._contour) - i + j
+            diff = j - i if j > i else len(self._cnt_off) - i + j
             segment_len = int(diff / pts_per_corner)
             for k in range(pts_per_corner):
-                result.append(self._contour[i % len(self._contour)])
+                result.append(self._cnt_off[i % self._cnt_len])
                 i = (i + segment_len) % self._cnt_len
             i = j
         self._norm_contour = np.asarray(result)
@@ -257,7 +299,6 @@ class Contour:
     def __init__(self, mask, num_pts=0):
         # the higher the number, the rougher the corner estimation
         self.CORNER_APPROX_EPSILON = 8.0
-        self.MAX_CONTOUR_PTS = 96
 
         self._mask = mask
         self._contour = Contour.find_contours(mask)
@@ -265,15 +306,24 @@ class Contour:
 
         self._corners = cv2.approxPolyDP(self._contour, self.CORNER_APPROX_EPSILON, True)
 
-        self._cnt_len = len(self._contour) + 1  # because it's in pixels
+        self._cnt_len = len(self._contour)
+
+        self._rect = cv2.boundingRect(self._contour)
+        self._offset = (int(self._mask.shape[1] / 2 - (self._rect[0] + self._rect[2] / 2)),
+                        int(self._mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
+
+        self._cnt_off = self._contour + self._offset
+        self._corn_off = self._corners + self._offset
 
         # map the corners back into the contour and normalize
         self.__find_super_corners()
         self.__map_corners(self._super_corners)
+        self.__fix_super_corners()
         self.__normalize_contour2(num_pts if num_pts > 0 else self.MAX_CONTOUR_PTS)
 
-        # redraw the mask based on the chosen contour
-        self._norm_mask = self.redraw_mask(self._contour)
+        # redraw the mask based on the chosen contour -- since normalized contour is already
+        # offset, shift it back to have the mask in the normal position
+        self._norm_mask = self.redraw_mask(self._norm_contour - self._offset)
 
         # offset is (x_off, y_off)
         # self._rect = cv2.boundingRect(self.__contour)
@@ -282,14 +332,7 @@ class Contour:
         #
         # self.cnt_off = self.__contour + self._offset
         # self.corn_off = self.corners + self._offset
-
-        self._rect = cv2.boundingRect(self._norm_contour)
-        self._offset = (int(self._mask.shape[1] / 2 - (self._rect[0] + self._rect[2] / 2)),
-                        int(self._mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
-
-        self._cnt_off = self._contour + self._offset
-        self._corn_off = self._corners + self._offset
-        self._norm_contour = self._norm_contour + self._offset
+        #self._norm_contour = self._norm_contour + self._offset
 
     def mask(self):
         return self._mask

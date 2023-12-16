@@ -7,10 +7,12 @@ from contours import Contour
 
 
 class SegGen2:
+
     def __init__(self, image_file_name, mask_file_name):
+        self.MAX_CONTOUR_PTS = 96
         self.img1 = cv2.imread(image_file_name)
         self.mask1 = cv2.imread(mask_file_name)
-        self.contour = Contour(self.mask1)
+        self.contour = Contour(self.mask1, self.MAX_CONTOUR_PTS)
 
     # given an object (image), region of interest (rect) and offset
     # return new image containing the rect shifted by offset
@@ -97,15 +99,30 @@ class SegGen2:
         obj2_warped = np.bitwise_and(obj2_warped, self.mask1)
         obj2_contour = Contour.find_contours(obj2_warped, cv2.CHAIN_APPROX_TC89_L1)
         obj2_contour_img = np.zeros_like(self.mask1)
+
+        #self.__debug(contour2,obj2_off)
+
+        if len(obj2_contour) == 0:
+            # try with fewer point?
+            if self.MAX_CONTOUR_PTS == 96:
+                self.MAX_CONTOUR_PTS /= 2
+                self.contour = Contour(self.mask1, self.MAX_CONTOUR_PTS)
+                return self.generate(image_file_name, mask_file_name)
+            else:
+                return self.img1
+
         self.__draw_contour(obj2_contour_img, obj2_contour)
 
         # # shrink mask by a couple pixels
         dist = cv2.distanceTransform(np.bitwise_not(cv2.cvtColor(obj2_contour_img, cv2.COLOR_BGR2GRAY)), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-        ring = cv2.inRange(dist, 3, 4)  # take all pixels at distance between
-        contours, h = cv2.findContours(ring, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_L1)
-        cont_list = list(contours)
-        cont_list.sort(key=lambda ctr: len(ctr))
-        obj2_contour2 = cont_list[-3]
+        ring = cv2.inRange(dist, 2, 4)  # take all pixels at distance between
+        contours, h_tree = cv2.findContours(ring, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
+        sel = (-1, -1)
+        for h in range(len(h_tree[0])):
+             if h_tree[0][h][2] == -1 and h_tree[0][h][3] != -1:
+                 if len(contours[h]) > sel[1]:
+                     sel = (h, len(contours[h]))
+        obj2_contour2 = contours[sel[0]]
         obj2_mask2 = contour2.redraw_mask(obj2_contour2)
 
         # generate the final image
