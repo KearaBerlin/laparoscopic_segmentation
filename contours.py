@@ -151,7 +151,6 @@ class Contour:
         # detect anomalies and fix them
         l = len(self._corner_map)
         avg = self._cnt_len / l
-        run = True
 
         for j in range(len(self._corner_map)):
             dist = []
@@ -319,7 +318,7 @@ class Contour:
         self.__find_super_corners()
         self.__map_corners(self._super_corners)
         self.__fix_super_corners()
-        self.__normalize_contour2(num_pts if num_pts > 0 else self.MAX_CONTOUR_PTS)
+        self.__normalize_contour2(num_pts)
 
         # redraw the mask based on the chosen contour -- since normalized contour is already
         # offset, shift it back to have the mask in the normal position
