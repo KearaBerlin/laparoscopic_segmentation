@@ -19,6 +19,7 @@ class Config():
     AUG_ID = 1 # none
     K = 0.1
     AUGS = ["none", "rand_pair"]
+    SEED = False
 
     MIXED_PRECISION = True
     EPOCHS = 100

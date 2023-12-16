@@ -14,7 +14,6 @@ import albumentations
 import multiprocessing
 
 from seg_gen import SegGen
-from seg_gen2 import SegGen2
 
 
 class CobotLoaderBinary(Dataset):
@@ -36,14 +35,16 @@ class CobotLoaderBinary(Dataset):
         self.images.append(img)
         self.labels.append(mask)
 
-    def __generate_aug(self, k):
+    def __generate_aug(self, k, seed=False):
         assert 0 <= k <= 1.0
-        rng = random.Random(42)
 
         num = len(self.files)
         k_num = num * k
         perms = list(itertools.permutations(range(num), 2))
-        pairs = rng.sample(perms, int(k_num * k_num))
+        pairs = random.sample(perms, int(k_num * k_num))
+        if seed:
+            rng = random.Random(42)
+            pairs = rng.sample(perms, int(k_num * k_num))
         gens = dict()
 
         for p in pairs:
@@ -51,18 +52,16 @@ class CobotLoaderBinary(Dataset):
             img_pair1 = self.files[p[0]]
             img_pair2 = self.files[p[1]]
             if gen is None:
-                gen = SegGen2(img_pair1[0], img_pair1[1])
+                gen = SegGen(img_pair1[0], img_pair1[1])
                 gens[p[0]] = gen
             img = gen.generate(img_pair2[0], img_pair2[1])
-            #fname = img_pair1[0].split("\\")[-1] + "_" + img_pair2[1].split("\\")[-1]
-            #cv2.imwrite("f:/temp/aug/" + fname, img)
 
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
     def __init__(self, root_dir, label, num_labels, transform, 
                  image_size=None, id=-1, create_negative_labels=False,
-                 aug_method="none", k_aug=0.0):
+                 aug_method="none", k_aug=0.0, seed=False):
 
         self.root_dir = root_dir
         self.images = []
@@ -95,7 +94,7 @@ class CobotLoaderBinary(Dataset):
             self.__add_file(img, mask_orig)
 
         if k_aug > 0 and aug_method == "rand_pair":
-            self.__generate_aug(k_aug)
+            self.__generate_aug(k_aug, seed)
 
     def get_frequency(self):
         return self.num_bg_pixels, self.num_pixels
