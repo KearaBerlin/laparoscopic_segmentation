@@ -1,17 +1,13 @@
-from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 from transformers import SegformerForSemanticSegmentation
 from torchvision import models
 import torch
-from torch.utils.tensorboard import SummaryWriter
-from torcheval.metrics import BinaryAccuracy, BinaryF1Score, BinaryPrecision, BinaryRecall
-from torchmetrics import JaccardIndex
 import torch.nn as nn
 import torch.optim as optim
 import torch.cuda.amp
 
 import dataloader
 import os
-import datetime
+from datetime import datetime
 
 import numpy as np
 import sys
@@ -20,7 +16,13 @@ import albumentations.augmentations.functional as F
 from albumentations.pytorch import ToTensorV2
 
 from models import UNet11
+from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 import argparse
+
+from torch.utils.tensorboard import SummaryWriter
+from torcheval.metrics import BinaryAccuracy, BinaryF1Score, BinaryPrecision, BinaryRecall
+from torchmetrics import JaccardIndex
+
 import importlib.util
 
 debug = False
@@ -39,7 +41,7 @@ sys.modules[config_namespace] = config
 spec.loader.exec_module(config)
 cfg = config.Config()
 
-output_folder = f"{cfg.output_folder}_{datetime.now.strftime('%m-%d-%Y_%H:%M')}"
+output_folder = f"{cfg.output_folder}_{datetime.now().strftime('%m-%d-%Y_%H%M')}"
 if not os.path.exists(output_folder):
     os.mkdir(output_folder)
 
@@ -132,7 +134,7 @@ for x in os.walk(cfg.data_dir):
         weights[0] += bg_w
         weights[c_lbl] += c_w
 
-print(weights)
+print('TraingSingle/weights',weights)
 n_samples = np.sum(weights)
 
 weights = n_samples/(cfg.num_classes*weights)
@@ -144,6 +146,7 @@ val_sets = torch.utils.data.ConcatDataset(val_sets)
 
 train_loader = torch.utils.data.DataLoader(train_sets, batch_size=cfg.mini_batch_size, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_sets, batch_size=cfg.mini_batch_size, shuffle=False)
+
 
 writer = SummaryWriter()
 writer.add_text("ConfigName", args.config_name, global_step=0)
@@ -189,6 +192,7 @@ for e in range(cfg.epochs):
     val_accuracy = []
 
     for img, lbl, _ in train_loader:
+        sys.exit()
         if img.size(0) < 2:
             continue
         img = img.to(device)
@@ -280,7 +284,7 @@ for e in range(cfg.epochs):
         best_epoch = e
         best_f1 = pytorch_metric_vals['f1']
         torch.save(model.state_dict(), os.path.join(cfg.output_folder, "model_best.th"))
-
+        
 log_file.write(f"Best f1: {best_f1} (epoch {best_epoch})")
 log_file.flush()
 

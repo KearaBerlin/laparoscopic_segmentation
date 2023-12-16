@@ -323,8 +323,9 @@ class Contour:
             result[j_min] = (i, d_min)
 
         # result now has for a map from corner (idx) of the other contour to closest corner (idx) on my contour
-
-
+        print("Contours::__NormContour3/result: ",result) #Added Debug
+        print("Contours::__NormContour3/other: ",other) #Added Debug
+  
         assert len(self._norm_contour) == other.num_pts()
 
     @staticmethod
