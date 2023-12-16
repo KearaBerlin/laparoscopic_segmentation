@@ -13,7 +13,7 @@ import cv2
 import albumentations
 import multiprocessing
 
-from seg_gen import SegGen
+from seg_gen2 import SegGen2
 
 
 class CobotLoaderBinary(Dataset):
@@ -52,7 +52,7 @@ class CobotLoaderBinary(Dataset):
             img_pair1 = self.files[p[0]]
             img_pair2 = self.files[p[1]]
             if gen is None:
-                gen = SegGen(img_pair1[0], img_pair1[1])
+                gen = SegGen2(img_pair1[0], img_pair1[1])
                 gens[p[0]] = gen
             img = gen.generate(img_pair2[0], img_pair2[1])
 

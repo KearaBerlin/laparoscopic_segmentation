@@ -27,12 +27,12 @@ class SegGen2:
         cv2.namedWindow("debug3", cv2.WINDOW_NORMAL)
         cv2.imshow("debug3", img)
 
-    def __draw_contour(self, img, contour, color=(255, 255, 255)):
+    def __draw_contour(self, img, contour, color=(255, 255, 255), thickness=1):
         ctr_r = contour[:, 0, :].astype(int)
         n1 = np.empty(tuple([1]) + ctr_r.shape, dtype=int)
         n1[0] = ctr_r
         t1 = tuple(n1)
-        cv2.drawContours(img, t1, 0, color, 1)
+        cv2.drawContours(img, t1, 0, color, thickness)
 
     def __debug(self, contour2, obj2_off):
         ######################################################
@@ -128,5 +128,15 @@ class SegGen2:
         # generate the final image
         img = np.bitwise_or(np.bitwise_and(np.bitwise_not(obj2_mask2), self.img1),
                             np.bitwise_and(obj2_warped, obj2_mask2))
+
+        blur_mask = np.zeros_like(img)
+        self.__draw_contour(blur_mask, obj2_contour2, thickness=10)
+        blur_img = np.bitwise_and(img, blur_mask)
+        blur_img = cv2.GaussianBlur(blur_img, (5, 5), 10)
+
+        blur_mask = np.zeros_like(img)
+        self.__draw_contour(blur_mask, obj2_contour2, thickness=6)
+        img = np.bitwise_or(np.bitwise_and(np.bitwise_not(blur_mask), img),
+                            np.bitwise_and(blur_mask, blur_img))
         return img
 
