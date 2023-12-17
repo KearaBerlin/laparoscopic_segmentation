@@ -11,19 +11,20 @@ class Config():
     # parser.add_argument("--unet", help="Specifity to use UNet instead of DeepLabV3"
 
     ORGAN_ID = 4
-    DATA_DIR = r"/scratch.global/laparoscopic_segmentation/Dresden/"
+    DATA_DIR = r"/scratch.global/laparoscopic_segmentation/Dresden/multilabel"
     OUTPUT_DIR = "."
     SEGFORMER = False
     UNET = False
-
-    AUG_ID = 1 # none
-    K = 0.2
-    AUGS = ["none", "rand_pair"]
-    SEED = True
+    P_NEG_IMG = 0.25
 
     MIXED_PRECISION = True
     EPOCHS = 100
     LR = 1e-6
+ 
+    AUG_ID = 1 # none
+    K = 0.1
+    AUGS = ["none", "rand_pair"]
+    SEED = False
 
     ORGANS = ["abdominal_wall",
                 "colon",
@@ -63,7 +64,6 @@ class Config():
         # self.val_ids = val_ids
         # self.test_ids = test_ids
     def __init__(self, organs=ORGANS, organ_id=ORGAN_ID,
-                 augs=AUGS, aug_id=AUG_ID,
                  batch_size=BATCH_SIZE, mini_batch_size=MINI_BATCH_SIZE,
                  unet=UNET, segformer=SEGFORMER,
                  output_dir=OUTPUT_DIR):
@@ -73,10 +73,9 @@ class Config():
                 setattr(self, key.lower(), value)
 
         self.organ = self.organs[organ_id]
+        self.aug = self.augs[self.aug_id]
         self.num_mini_batches = self.batch_size//self.mini_batch_size
         
-        self.aug = self.augs[aug_id]
-
         self.output_folder = "Seg_single_" + self.organ
         if self.unet:
             self.output_folder += "_unet"

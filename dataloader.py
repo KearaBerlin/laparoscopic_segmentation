@@ -65,7 +65,7 @@ class CobotLoaderBinary(Dataset):
 
     def __init__(self, root_dir, label, num_labels, transform, 
                  image_size=None, id=-1, create_negative_labels=False,
-                 organ_name=None,
+                 organ_name=None, p_neg_img=0.1,
                  aug_method="none", k_aug=0.0, seed=False):
 
         self.root_dir = root_dir
@@ -77,6 +77,7 @@ class CobotLoaderBinary(Dataset):
 
         self.transform = transform
         self.create_negative_labels = create_negative_labels
+        self.p_neg_img = p_neg_img 	# percent of images with all-0 mask to include
 
         self.num_pixels = 0
         self.num_bg_pixels = 0
@@ -100,13 +101,22 @@ class CobotLoaderBinary(Dataset):
         for i, (file, mask_file) in enumerate(self.files):
             img = cv2.imread(file)
             mask_orig = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
-            self.__add_file(img, mask_orig)
             # keep track of images with the given organ in them 
-            if organ_name is not None and np.sum(mask_orig) > 0:
-                self.organ_ii.append(i)
+            if organ_name is not None:
+                if np.sum(mask_orig) > 0:
+                    self.organ_ii.append(i)
+			    # only include p_neg_img % of images without the given organ
+                else:
+                    rn = random.uniform(0,1)
+                    #print(rn)
+                    if rn > self.p_neg_img:
+                        continue
+            self.__add_file(img, mask_orig)
 
         if k_aug > 0 and aug_method == "rand_pair":
             self.__generate_aug(k_aug, seed)
+            
+        print(f"images: {len(self.images)}")
 
     def get_frequency(self):
         return self.num_bg_pixels, self.num_pixels
