@@ -11,15 +11,11 @@ def load_image(image_path):
         return None
     return image
 
-image_path = 'images/Triangle_black_white.svg.png'
-image = load_image(image_path)
+image = cv2.imread('images/hliv_1.jpg')
+ref_image = cv2.imread('images/hliv_2.jfif')
 
-image = cv2.imread('images/Triangle_black_white.svg.png')
-ref_image = cv2.imread('images/Triangle_file.486.png')
-
-print(image)
-print(ref_image)
-
+print(load_image(image)) # error check
+print(load_image(ref_image)) #error check
 
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -33,6 +29,7 @@ ref_contours, _ = cv2.findContours(ref_thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_S
 
 ref_contour = max(ref_contours, key=cv2.contourArea)
 
+# will check for any match, if true, similarity score will get a hit. Current threshold that always works (0.3)
 for contour in contours:
     similarity = cv2.matchShapes(ref_contour, contour, cv2.CONTOURS_MATCH_I1, 0.0)
     print(f"Similarity: {similarity}")
