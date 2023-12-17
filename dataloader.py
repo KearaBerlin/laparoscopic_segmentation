@@ -1,6 +1,7 @@
 import itertools
 import os, sys
 import random
+from pathlib import Path
 
 from torch._C import dtype
 from torch.utils.data import Dataset
@@ -8,6 +9,7 @@ from torchvision import transforms
 import torchvision.utils as vutils
 import torch
 import numpy as np
+import pandas as pd
 import math
 import cv2
 import albumentations
@@ -63,9 +65,41 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
+    def add_file_and_mask(self, file):
+        
+        mask_filename = file.replace("image", "mask")
+        self.files.append((file, mask_filename))
+
+    def add_neg_imgs(self):
+        root = Path(self.root_dir)
+        data_dir = root.parent.parent.absolute()
+        print(f"data dir: {data_dir}")
+
+        subfolders = [f for f in os.scandir(data_dir) if f.is_dir()]
+
+        for folder in subfolders:
+            if folder.name in ["multilabel",self.organ_name]:
+                continue
+
+            id_subfolder = os.path.join(data_dir,folder.name,root.name)
+            if os.path.exists(id_subfolder):
+                files = [f for f in os.scandir(id_subfolder) if f.is_file()]
+
+                df = pd.read_csv(os.path.join(id_subfolder, 'weak_labels.csv'), header=None)
+                neg_img_df = df[df.iloc[:, self.organ_id+1] == 0]
+                neg_imgs = list(neg_img_df.iloc[:,0])
+                # the file names are different for some reason, so fix them
+                neg_imgs = [fn.replace("images0","image") for fn in neg_imgs]
+
+                for file in files:
+                    rn = random.uniform(0,1)
+                    if file.name in neg_imgs and rn > self.p_neg_img:
+                        self.add_file_and_mask(os.path.join(id_subfolder, file.name))
+
+
     def __init__(self, root_dir, label, num_labels, transform, 
                  image_size=None, id=-1, create_negative_labels=False,
-                 organ_name=None, p_neg_img=0.1,
+                 organ_id=None, organ_name=None, p_neg_img=0.1,
                  aug_method="none", k_aug=0.0, seed=False):
 
         self.root_dir = root_dir
@@ -74,6 +108,7 @@ class CobotLoaderBinary(Dataset):
 
         self.label = label
         self.organ_name = organ_name
+        self.organ_id = organ_id
 
         self.transform = transform
         self.create_negative_labels = create_negative_labels
@@ -92,31 +127,20 @@ class CobotLoaderBinary(Dataset):
         for file in os.listdir(self.root_dir):
             if "png" in file and file[0:5] == "image":
                 file = os.path.join(self.root_dir, file)
-                mask_filename = file.replace("image", "mask")
-                if self.organ_name is not None:
-                    mask_filename = mask_filename.replace(".png", f"_{organ_name}.png")
-                self.files.append((file, mask_filename))
+                self.add_file_and_mask(file)
 
-        self.organ_ii = []
+        if self.p_neg_img > 0:
+            self.add_neg_imgs()
+            
         for i, (file, mask_file) in enumerate(self.files):
             img = cv2.imread(file)
             mask_orig = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
-            # keep track of images with the given organ in them 
-            if organ_name is not None:
-                if np.sum(mask_orig) > 0:
-                    self.organ_ii.append(i)
-			    # only include p_neg_img % of images without the given organ
-                else:
-                    rn = random.uniform(0,1)
-                    #print(rn)
-                    if rn > self.p_neg_img:
-                        continue
             self.__add_file(img, mask_orig)
 
         if k_aug > 0 and aug_method == "rand_pair":
             self.__generate_aug(k_aug, seed)
-            
-        print(f"images: {len(self.images)}")
+
+        print(f"files: {len(self.files)}")
 
     def get_frequency(self):
         return self.num_bg_pixels, self.num_pixels

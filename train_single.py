@@ -132,12 +132,13 @@ for x in os.walk(cfg.data_dir):
     # Create dataloaders
     if val:
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.val_transform,
-                                               organ_name=cfg.organ, p_neg_img=cfg.p_neg_img,
+                                               organ_id=cfg.organ_id, organ_name=cfg.organ, 
+                                               p_neg_img=cfg.p_neg_img,
                                                image_size=cfg.image_size)
         val_sets.append(dataset)
     else:
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.train_transform, 
-                                               image_size=cfg.image_size, 
+                                               image_size=cfg.image_size, organ_id=cfg.organ_id,
                                                organ_name=cfg.organ, p_neg_img=cfg.p_neg_img,
                                                aug_method=cfg.aug, k_aug=cfg.k, seed=cfg.seed)
         train_sets.append(dataset)
