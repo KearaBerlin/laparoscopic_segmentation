@@ -11,7 +11,7 @@ import torch.cuda.amp
 
 import dataloader
 import os
-from _datetime import datetime
+from datetime import datetime
 
 import numpy as np
 import sys
@@ -39,7 +39,7 @@ sys.modules[config_namespace] = config
 spec.loader.exec_module(config)
 cfg = config.Config()
 
-output_folder = f"{cfg.output_folder}_{datetime.now.strftime('%m-%d-%Y_%H:%M')}"
+output_folder = f"{cfg.output_folder}_{datetime.now().strftime('%m-%d-%Y_%H_%M')}"
 if not os.path.exists(output_folder):
     os.mkdir(output_folder)
 
