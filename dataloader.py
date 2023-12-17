@@ -124,10 +124,14 @@ class CobotLoaderBinary(Dataset):
         self.image_size = image_size
 
         self.files = []
+        self.organ_ii = []
+        i = 0
         for file in os.listdir(self.root_dir):
             if "png" in file and file[0:5] == "image":
                 file = os.path.join(self.root_dir, file)
                 self.add_file_and_mask(file)
+                self.organ_ii.append(i)
+                i += 1
 
         if self.p_neg_img > 0:
             self.add_neg_imgs()
