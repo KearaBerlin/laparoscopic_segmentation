@@ -91,11 +91,7 @@ def tb_log(epoch, writer, names, metrics):
 
 weights = np.zeros(cfg.num_classes, dtype=np.float32)
 
-multilabel = "multilabel" in cfg.data_dir
-print(f"multilabel? {multilabel}")
-
 for x in os.walk(cfg.data_dir):
-    print(f"x0 = {x[0]}")
     val = False
     test = False
 
@@ -104,21 +100,16 @@ for x in os.walk(cfg.data_dir):
         if not "03" in x[0] and not "04" in x[0] and not "05" in x[0]:
             continue
 
-    if multilabel:
-        c_lbl = 1
-    elif cfg.organ in x[0]:
-        print("organ in fodler")
+    if cfg.organ in x[0]:
         c_lbl = 1
     else:
         continue
 
     if not os.path.isfile(x[0] + "/image00.png"):
-        print("no image00.png")
         continue
 
     for id in cfg.test_ids: #Skip test data
         if id in x[0]:
-            print("test id")
             test = True
             break
     if test:
