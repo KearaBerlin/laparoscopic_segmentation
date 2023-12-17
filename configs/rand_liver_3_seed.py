@@ -17,7 +17,7 @@ class Config():
     UNET = False
 
     AUG_ID = 1 # none
-    K = 0.1
+    K = 0.3
     AUGS = ["none", "rand_pair"]
     SEED = True
 

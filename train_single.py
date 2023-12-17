@@ -39,9 +39,13 @@ sys.modules[config_namespace] = config
 spec.loader.exec_module(config)
 cfg = config.Config()
 
-output_folder = f"{cfg.output_folder}_{datetime.now().strftime('%m-%d-%Y_%H_%M')}"
+output_folder = os.path.join(
+    cfg.output_folder,
+    "outputs",
+    f"{datetime.now().strftime('%m-%d-%Y_%H:%M')}"
+)
 if not os.path.exists(output_folder):
-    os.mkdir(output_folder)
+    os.makedirs(output_folder)
 
 log_file = open(os.path.join(output_folder, "log.txt"), "w")
 def log(s):
@@ -118,13 +122,17 @@ for x in os.walk(cfg.data_dir):
 
     # Create dataloaders
     if val:
-        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.val_transform, 
+        dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.val_transform,
+                                               organ_id=cfg.organ_id, organ_name=cfg.organ, 
+                                               p_neg_img=cfg.p_neg_img,
                                                image_size=cfg.image_size)
         val_sets.append(dataset)
     else:
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.train_transform, 
-                                               image_size=cfg.image_size, 
+                                               image_size=cfg.image_size, organ_id=cfg.organ_id,
+                                               organ_name=cfg.organ, p_neg_img=cfg.p_neg_img,
                                                aug_method=cfg.aug, k_aug=cfg.k, seed=cfg.seed)
+        print(f"Files: {dataset.__len__()} with p={cfg.p_neg_img}\nfrom {x[0]}")
         train_sets.append(dataset)
         #Collect frequencies for class weights
         bg_w, p = dataset.get_frequency()
@@ -272,14 +280,14 @@ for e in range(cfg.epochs):
     scheduler.step()
 
     if (e + 1) % 10 == 0:
-        torch.save(model.state_dict(), os.path.join(cfg.output_folder, "model%04d.th" % e))
+        torch.save(model.state_dict(), os.path.join(output_folder, "model%04d.th" % e))
         log(f"Epoch {e}: val loss: {metrics[1]} jac: {pytorch_metric_vals['jaccard']}")
 
 
     if best_f1 < pytorch_metric_vals['f1']:
         best_epoch = e
         best_f1 = pytorch_metric_vals['f1']
-        torch.save(model.state_dict(), os.path.join(cfg.output_folder, "model_best.th"))
+        torch.save(model.state_dict(), os.path.join(output_folder, "model_best.th"))
 
 log_file.write(f"Best f1: {best_f1} (epoch {best_epoch})")
 log_file.flush()
