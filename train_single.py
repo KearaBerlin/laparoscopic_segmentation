@@ -129,10 +129,9 @@ for x in os.walk(cfg.data_dir):
         val_sets.append(dataset)
     else:
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.train_transform, 
-                                               image_size=cfg.image_size, organ_id=cfg.organ_id,
-                                               organ_name=cfg.organ, p_neg_img=cfg.p_neg_img,
-                                               aug_method=cfg.aug, k_aug=cfg.k, seed=cfg.seed)
-        print(f"Files: {dataset.__len__()} with p={cfg.p_neg_img}\nfrom {x[0]}")
+                                               image_size=cfg.image_size, 
+                                               aug_method=cfg.aug, k_aug=cfg.k, seed=cfg.seed,sim_score=cfg.sim_score)
+
         train_sets.append(dataset)
         #Collect frequencies for class weights
         bg_w, p = dataset.get_frequency()

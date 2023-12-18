@@ -68,13 +68,38 @@ class CobotLoaderBinary(Dataset):
 
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
-            
-    def __generate_aug_single(self, idx, weights=None):
-        #weights is an optional dictionary of (idx,weight) to set pair selection. None defaults to uniform, global selection
+    def __get_item_pair_similarity(self,idx1,idx2):
+        gray = cv2.cvtColor(self.images[idx1], cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
+        ref_gray = cv2.cvtColor(self.images[idx2], cv2.COLOR_BGR2GRAY)
+        _, ref_thresh = cv2.threshold(ref_gray, 127, 255, cv2.THRESH_BINARY_INV)
+        ref_contours, _ = cv2.findContours(ref_thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        ref_contour = max(ref_contours, key=cv2.contourArea)
+        
+        for contour in contours:
+            similarity = cv2.matchShapes(ref_contour, contour, cv2.CONTOURS_MATCH_I1, 0.0)
+            #We should only get one item, right?
+            print(f"Dataloader::Similarity({idx1},{idx2})={similarity}")
+
+        return similarity
+        
+    def __generate_aug_single(self, idx, similarity=-1):
+        #weights is an optional dictionary of (idx,weight) to set pair selection. None defaults to uniform, global selection
         img_pair1 = self.files[idx]
-        idx2 = np.random.choice(len(self.files),p=weights)
+        idx2 = np.random.choice(len(self.files))
         img_pair2 = self.files[idx2]
+        
+        iter_lim=0
+        while iter_lim < 10 and similarity>np.abs(self.sim_score):
+            idx2 = np.random.choice(len(self.files))
+            img_pair2 = self.files[idx2]
+            similarity=self.__get_item_pair_similarity(idx1,idx2)
+            print(f"Generate_Augs::PairSimilarity S={similarity}")
+            iter_lim+=1
+        if (iter_lim>=10):
+            print("Generate_Augs::PairSimilarity Too many tries to meet similarity threshold")
         
         gen = self.aug_gens.get(idx)
         if gen is None:
@@ -84,8 +109,7 @@ class CobotLoaderBinary(Dataset):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         if self.image_size is not None:
             img = cv2.resize(img, self.image_size)
-        #mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
-        #self.__add_file(img, mask_orig)
+
         return img
 
     def add_file_and_mask(self, file):
@@ -122,7 +146,12 @@ class CobotLoaderBinary(Dataset):
 
     def __init__(self, root_dir, label, num_labels, transform, 
                  image_size=None, id=-1, create_negative_labels=False,
+<<<<<<< HEAD
                  aug_method="none", k_aug=0.0, seed=False,batch_size=1):
+=======
+                 aug_method="none", k_aug=0.0, seed=False,batch_size=1,sim_score=None):
+
+>>>>>>> Implemented similarity based pair selection
         self.root_dir = root_dir
         self.images = []
         self.labels = []
@@ -147,6 +176,7 @@ class CobotLoaderBinary(Dataset):
         self.aug_gens=dict()
         self.aug_method=aug_method
         self.k_aug=k_aug
+        self.sim_score=sim_score
         
         if seed:
             np.random.seed(seed)
@@ -178,6 +208,8 @@ class CobotLoaderBinary(Dataset):
             img = cv2.imread(file)
             mask_orig = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
+            
+        self.N=len(self.files)
 
     def get_frequency(self):
         return self.num_bg_pixels, self.num_pixels
@@ -189,14 +221,25 @@ class CobotLoaderBinary(Dataset):
         img = self.images[idx]
         mask = self.labels[idx]
         do_aug=False
-        if self.k_aug > 0:
+        k=self.k_aug
+        if k > 0:
             #Choose augmentation with probability k for each sample
-            do_aug=np.random.choice((False,True),self.batch_size,(1-self.k_aug,self.k_aug))
+            n=self.N
+            q=(n*k)/(n+(n*k)) #Calculate P of choosing augmented sample from augmentation fraction k
+            assert(q<1)
+            p=1-q
+            do_aug=np.random.choice((False,True),self.batch_size,(p,q))
         
         
-        if do_aug:
-            if 'rand_pair' in self.aug_method:
+        if do_aug == True:
+            print("Getitem:AugMethod ",self.aug_method)
+            if "rand_pair" in self.aug_method:
+                print("Getitem/aug_method -- Detected Global Rand Pair")
                 img=self.__generate_aug_single(idx)
+            if "sim_pair" in self.aug_method and self.sim_score is not None:
+                print("Getitem/aug_method -- Detected Global Similar Pair")
+                img=self.__generate_aug_single(idx,self.sim_score)
+                
 
         if self.create_negative_labels:
             masks = []
