@@ -16,6 +16,7 @@ class Config():
     SEGFORMER = False
     UNET = False
 
+    P_NEG_IMG = 0
     AUG_ID = 1 # none
     K = 0.1
     AUGS = ["none", "rand_pair"]
