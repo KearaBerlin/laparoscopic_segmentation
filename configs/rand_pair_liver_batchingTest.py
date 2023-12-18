@@ -16,8 +16,9 @@ class Config():
     SEGFORMER = False
     UNET = False
 
-    AUG_ID = 1 # none
+    AUG_ID = 2 # none
     K = 0.1
+    SIM_SCORE=0.1
     SEED=1234
     AUGS = ["none", "rand_pair","sim_pair"] #sim_pair -- pairing from similarity score not implmented
 
@@ -66,7 +67,7 @@ class Config():
                  augs=AUGS, aug_id=AUG_ID,
                  batch_size=BATCH_SIZE, mini_batch_size=MINI_BATCH_SIZE,
                  unet=UNET, segformer=SEGFORMER,
-                 output_dir=OUTPUT_DIR,seed=SEED):
+                 output_dir=OUTPUT_DIR,seed=SEED,sim_score=SIM_SCORE):
         
         for (key, value) in vars(Config).items():
             if not key.startswith("_"):

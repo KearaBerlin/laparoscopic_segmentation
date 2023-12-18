@@ -126,7 +126,7 @@ for x in os.walk(cfg.data_dir):
     else:
         dataset = dataloader.CobotLoaderBinary(x[0], c_lbl, cfg.num_classes, cfg.train_transform, 
                                                image_size=cfg.image_size, 
-                                               aug_method=cfg.aug, k_aug=cfg.k, seed=cfg.seed)
+                                               aug_method=cfg.aug, k_aug=cfg.k, seed=cfg.seed,sim_score=cfg.sim_score)
         train_sets.append(dataset)
         #Collect frequencies for class weights
         bg_w, p = dataset.get_frequency()
