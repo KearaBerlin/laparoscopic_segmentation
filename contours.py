@@ -189,10 +189,10 @@ class Contour:
 
 
     def __find_super_corners(self):
-        img_corners = [[0, 0], [self._mask.shape[0] / 2, 0], [self._mask.shape[0], 0],
-                       [self._mask.shape[0], self._mask.shape[1] / 2], [self._mask.shape[0], self._mask.shape[1]],
-                       [self._mask.shape[0] / 2, self._mask.shape[1]], [0, self._mask.shape[1]],
-                       [0, self._mask.shape[1] / 2]]
+        img_corners = [[0, 0], [self._mask.shape[1] / 2, 0], [self._mask.shape[1], 0],
+                       [self._mask.shape[1], self._mask.shape[0] / 2], [self._mask.shape[1], self._mask.shape[0]],
+                       [self._mask.shape[1] / 2, self._mask.shape[0]], [0, self._mask.shape[0]],
+                       [0, self._mask.shape[0] / 2]]
 
         # looks like contours go in the opposite direction
         img_corners = img_corners[::-1]
