@@ -73,7 +73,7 @@ class SegGen2:
     def generate(self, image_file_name, mask_file_name):
         img2 = cv2.imread(image_file_name)
         mask2 = cv2.imread(mask_file_name)
-        contour2 = Contour(mask2, self.contour)
+        contour2 = Contour(mask2, self.contour.num_pts())
         obj2_off = self.__generate_obj2(img2, contour2)
 
         # reshaped contours, necessary for the transformer
@@ -95,7 +95,6 @@ class SegGen2:
         roi_off = (obj1_roi[0] + off1[0], obj1_roi[1] + off1[1], obj1_roi[2], obj1_roi[3])
         obj2_warped = self.__shift_object(obj2_p, roi_off, np.negative(off1))
 
-
         # recompute the mask for the warped object
         obj2_warped = np.bitwise_and(obj2_warped, self.mask1)
         obj2_contour = Contour.find_contours(obj2_warped, cv2.CHAIN_APPROX_TC89_L1)
@@ -116,13 +115,14 @@ class SegGen2:
 
         # # shrink mask by a couple pixels
         dist = cv2.distanceTransform(np.bitwise_not(cv2.cvtColor(obj2_contour_img, cv2.COLOR_BGR2GRAY)), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-        ring = cv2.inRange(dist, 3, 4)  # take all pixels at distance between
+        ring = cv2.inRange(dist, 2, 4)  # take all pixels at distance between
         contours, h_tree = cv2.findContours(ring, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
+        sel = (-1, -1)
         for h in range(len(h_tree[0])):
-            if h_tree[0][h][2] == -1 and h_tree[0][h][3] != -1:
-                break
-
-        obj2_contour2 = contours[h]
+             if h_tree[0][h][2] == -1 and h_tree[0][h][3] != -1:
+                 if len(contours[h]) > sel[1]:
+                     sel = (h, len(contours[h]))
+        obj2_contour2 = contours[sel[0]]
         obj2_mask2 = contour2.redraw_mask(obj2_contour2)
 
         # generate the final image
@@ -139,4 +139,3 @@ class SegGen2:
         img = np.bitwise_or(np.bitwise_and(np.bitwise_not(blur_mask), img),
                             np.bitwise_and(blur_mask, blur_img))
         return img
-
