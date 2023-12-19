@@ -1,3 +1,5 @@
+# the code in this file is modified from the original authors' open source code.
+
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 from transformers import SegformerForSemanticSegmentation
 from torchvision import models
@@ -30,7 +32,7 @@ parser.add_argument("config_dir", help="Directory path of config files")
 parser.add_argument("config_name", help="Name of config to import, e.g. default_config if the config file is default_config.py")
 args = parser.parse_args()
 
-# import config
+# import config (added Fall 2023) based on https://stackoverflow.com/questions/67631/how-can-i-import-a-module-dynamically-given-the-full-path
 config_namespace = f"configs.{args.config_name}"
 config_fp = os.path.join(args.config_dir, f"{args.config_name}.py")
 spec = importlib.util.spec_from_file_location(config_namespace, config_fp)
@@ -39,6 +41,7 @@ sys.modules[config_namespace] = config
 spec.loader.exec_module(config)
 cfg = config.Config()
 
+# added new output logic Fall 2023
 output_folder = os.path.join(
     cfg.output_folder,
     "outputs",
@@ -67,6 +70,7 @@ val_sets = []
 
 print("Loading data")
 
+# added new library implementation of metrics and Tensorboard support Fall 2023
 def update_metrics(pred, lbl):
     for i in range(pred.size(0)):
         for (name, metric) in pytorch_metrics.items():
@@ -269,6 +273,7 @@ for e in range(cfg.epochs):
                 val_accuracy.append(torch.sum(pred == lbl).item()/(cfg.mini_batch_size*cfg.image_size[0]*cfg.image_size[1]))
                 val_batches += 1
 
+    # update metric calculation and add tensorboard support Fall 2023
     pytorch_metric_vals = compute_pytorch_metrics()
     train_loss_val = train_loss_sum / train_batches if train_batches > 0 else 1
     val_loss_val = val_loss_sum / val_batches if val_batches > 0 else 1
