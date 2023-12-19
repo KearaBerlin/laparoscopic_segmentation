@@ -45,25 +45,34 @@ class CobotLoaderBinary(Dataset):
 
         self.images.append(img)
         self.labels.append(mask)
-        self.masks.append(mask_image)
+        #self.masks.append(mask_image)
 
     def __generate_aug(self, k, seed=False):
         assert 0 <= k <= 1.0
 
         #print("Generate_Augs/k: ",k)
         num = len(self.files)
+        #print("Generate_Augs/num: ",num)
 
         k_num = num * k
+        i_num = 0
         perms = list(itertools.permutations(range(num), 2))
-        pairs = random.sample(perms, int(k_num * k_num))
+        #print("Generate_Augs/perms: ",perms)
+        pairs = random.sample(perms, int((num-1) * (num-1)))
         if seed:
             rng = random.Random(42)
-            pairs = rng.sample(perms, int(k_num * k_num))
+            pairs = rng.sample(perms, int((num-1) * (num-1)))
         gens = dict()
-        #print("Generate_Augs/perms: ",perms)
+        
         #print("Generate_Augs/gens: ",gens)
 
         for p in pairs:
+            #With Similar Pair enabled, skip pass if items are dissimilar.
+            S=self.__get_item_pair_similarity_fast(p[0],p[1])
+            #print("Generate_Augs/S: ",S)
+            if "sim_pair" in self.aug_method and S<self.sim_score:
+                continue
+                
             i_0 = self.organ_ii[p[0]]
             i_1 = self.organ_ii[p[1]]
 
@@ -78,6 +87,10 @@ class CobotLoaderBinary(Dataset):
 
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
+            i_num+=1
+            if i_num>=k_num:
+                break #End Aug Loop after we collect k_num augmented images
+    """
     def __get_item_pair_similarity(self,idx1,idx2):
         #gray = cv2.cvtColor(self.labels[idx1], cv2.COLOR_BGR2GRAY)
         #_, thresh = cv2.threshold(self.labels[idx1], 127, 255, cv2.THRESH_BINARY_INV)
@@ -91,7 +104,13 @@ class CobotLoaderBinary(Dataset):
         #print(f"Dataloader::Similarity({self.files[idx1][1]},{self.files[idx2][1]})={similarity}")
 
         return similarity
-        
+    """
+    def __get_item_pair_similarity_fast(self,idx1,idx2):
+        dist=np.bitwise_xor(self.labels[idx1],self.labels[idx2])
+        similarity=np.sum(dist)/(self.image_size[0]*self.image_size[1])
+        #print(f"SimilarityFast: S({self.files[idx1][1]},{self.files[idx2][1]})={similarity}")
+        return similarity
+    """    
     def __generate_aug_single(self, idx, similarity=-1):
         #weights is an optional dictionary of (idx,weight) to set pair selection. None defaults to uniform, global selection
         img_pair1 = self.files[idx]
@@ -119,7 +138,7 @@ class CobotLoaderBinary(Dataset):
             img = cv2.resize(img, self.image_size)
 
         return img
-
+        """
     def add_file_and_mask(self, file):
         
         mask_filename = file.replace("image", "mask")
@@ -172,24 +191,14 @@ class CobotLoaderBinary(Dataset):
 
         self.num_pixels = 0
         self.num_bg_pixels = 0
-        self.files = []
         self.a_masks = []
 
         self.id = id
         self.num_labels = num_labels
         self.image_size = image_size
         
-        self.aug_gens=dict()
-        self.aug_method=aug_method
-        self.k_aug=k_aug
-
-        if sim_score is not None:
-            self.sim_score=sim_score
-        else:
-            self.sim_score=inf
         
-        if seed:
-            np.random.seed(seed)
+        """
         self.rng = np.random.default_rng()
         #Batchwise not tested! -- This is only for mutual augmentation within batch.
         if 'batchwise' in self.aug_method and batch_size >10:
@@ -200,7 +209,7 @@ class CobotLoaderBinary(Dataset):
         else:
             self.batch_size=1
             #print('Dataloader:__init__  Using Global augmentation pairing')
-
+        """
         self.files = []
         self.organ_ii = []
         i = 0
@@ -220,6 +229,17 @@ class CobotLoaderBinary(Dataset):
             self.__add_file(img, mask_orig)
             
         self.N=len(self.files)
+        self.aug_gens=dict()
+        self.aug_method=aug_method
+        self.k_aug=k_aug
+
+        if sim_score is not None:
+            self.sim_score=sim_score
+        else:
+            self.sim_score=0
+            
+        if "none" not in self.aug_method:
+            self.__generate_aug(k_aug,seed)
 
     def get_frequency(self):
         return self.num_bg_pixels, self.num_pixels
@@ -230,6 +250,8 @@ class CobotLoaderBinary(Dataset):
     def __getitem__(self, idx):
         img = self.images[idx]
         mask = self.labels[idx]
+        
+        """
         do_aug=False
         k=self.k_aug
         if k > 0:
@@ -250,7 +272,7 @@ class CobotLoaderBinary(Dataset):
             if "sim_pair" in self.aug_method and self.sim_score is not None:
                 #print("Getitem/aug_method -- Detected Global Similar Pair")
                 img=self.__generate_aug_single(idx,self.sim_score)
-                
+        """        
 
         if self.create_negative_labels:
             masks = []
