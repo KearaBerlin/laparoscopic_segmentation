@@ -51,7 +51,7 @@ class CobotLoaderBinary(Dataset):
         assert 0 <= k <= 1.0
 
         #print("Generate_Augs/k: ",k)
-        num = len(self.files)
+        num = len(self.organ_ii)
         #print("Generate_Augs/num: ",num)
 
         k_num = num * k
