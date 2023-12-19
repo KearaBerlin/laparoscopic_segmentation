@@ -253,8 +253,8 @@ class Contour:
 
         for c in corners:
             while True:
-                p = self._cnt_off[p_idx]
-                if np.array_equal(c, p[0]):
+                p = self._contour[p_idx]
+                if np.array_equal(c, p):
                     self._corner_map[c_idx] = p_idx
                     c_idx += 1
                     p_idx = (p_idx + 1) % self._cnt_len
@@ -289,7 +289,7 @@ class Contour:
 
         for j_idx in range(1, len(self._corner_map) + 1):
             j = self._corner_map[j_idx % len(self._corner_map)]
-            diff = j - i if j > i else len(self._cnt_off) - i + j
+            diff = j - i if j > i else self._cnt_len - i + j
             segment_len = int(diff / pts_per_corner)
             for k in range(pts_per_corner):
                 result.append(self._contour[i % self._cnt_len])
@@ -322,9 +322,10 @@ class Contour:
             result[j_min] = (i, d_min)
 
         # result now has for a map from corner (idx) of the other contour to closest corner (idx) on my contour
+
         print("Contours::__NormContour3/result: ",result) #Added Debug
         print("Contours::__NormContour3/other: ",other) #Added Debug
-  
+
         assert len(self._norm_contour) == other.num_pts()
 
     @staticmethod
@@ -383,6 +384,7 @@ class Contour:
         # self.cnt_off = self.__contour + self._offset
         # self.corn_off = self.corners + self._offset
         #self._norm_contour = self._norm_contour + self._offset
+
 
     def mask(self):
         return self._mask

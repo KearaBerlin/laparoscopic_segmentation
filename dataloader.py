@@ -15,6 +15,7 @@ import cv2
 import albumentations
 import multiprocessing
 
+from seg_gen import SegGen
 from seg_gen2 import SegGen2
 
 
@@ -120,7 +121,7 @@ class CobotLoaderBinary(Dataset):
     def add_neg_imgs(self):
         root = Path(self.root_dir)
         data_dir = root.parent.parent.absolute()
-        print(f"data dir: {data_dir}")
+        #print(f"data dir: {data_dir}")
 
         subfolders = [f for f in os.scandir(data_dir) if f.is_dir()]
 
@@ -146,12 +147,9 @@ class CobotLoaderBinary(Dataset):
 
     def __init__(self, root_dir, label, num_labels, transform, 
                  image_size=None, id=-1, create_negative_labels=False,
-<<<<<<< HEAD
-                 aug_method="none", k_aug=0.0, seed=False,batch_size=1):
-=======
-                 aug_method="none", k_aug=0.0, seed=False,batch_size=1,sim_score=None):
+                 organ_id=None, organ_name=None, p_neg_img=0.1,
+                 aug_method="none", k_aug=0.0, seed=False, batch_size=1,sim_score=None):
 
->>>>>>> Implemented similarity based pair selection
         self.root_dir = root_dir
         self.images = []
         self.labels = []
@@ -232,7 +230,7 @@ class CobotLoaderBinary(Dataset):
         
         
         if do_aug == True:
-            print("Getitem:AugMethod ",self.aug_method)
+            #print("Getitem:AugMethod ",self.aug_method)
             if "rand_pair" in self.aug_method:
                 print("Getitem/aug_method -- Detected Global Rand Pair")
                 img=self.__generate_aug_single(idx)

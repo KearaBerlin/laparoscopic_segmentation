@@ -15,6 +15,7 @@ class Config():
     OUTPUT_DIR = "."
     SEGFORMER = False
     UNET = False
+    P_NEG_IMG = 0.5
 
     AUG_ID = 2 # none
     K = 0.1
@@ -68,7 +69,7 @@ class Config():
                  batch_size=BATCH_SIZE, mini_batch_size=MINI_BATCH_SIZE,
                  unet=UNET, segformer=SEGFORMER,
                  output_dir=OUTPUT_DIR,seed=SEED,sim_score=SIM_SCORE):
-        
+
         for (key, value) in vars(Config).items():
             if not key.startswith("_"):
                 setattr(self, key.lower(), value)
