@@ -104,7 +104,7 @@ class CobotLoaderBinary(Dataset):
         
         gen = self.aug_gens.get(idx)
         if gen is None:
-            gen = SegGen(img_pair1[0], img_pair1[1])
+            gen = SegGen2(img_pair1[0], img_pair1[1])
             self.aug_gens[idx] = gen
         img = gen.generate(img_pair2[0], img_pair2[1])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

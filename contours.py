@@ -222,30 +222,6 @@ class Contour:
 
         assert len(self._super_corners) == len(img_corners)
 
-    def __find_super_corners_slow(self):
-        img_corners = [[0, 0], [self._mask.shape[0] / 2, 0], [self._mask.shape[0], 0],
-                       [self._mask.shape[0], self._mask.shape[1] / 2], [self._mask.shape[0], self._mask.shape[1]],
-                       [self._mask.shape[0] / 2, self._mask.shape[1]], [0, self._mask.shape[1]],
-                       [0, self._mask.shape[1] / 2]]
-
-        # looks like contours go in the opposite direction
-        img_corners = img_corners[::-1]
-        corners = list()
-
-        # find the contour points closest to corners
-        for pt1 in img_corners:
-            d_min = 999999999
-            pt_min = []
-            for pt2 in self._contour:
-                d = np.linalg.norm(np.subtract(pt1, pt2[0]))
-                if d_min > d:
-                    d_min = d
-                    pt_min = pt2[0]
-            corners.append(pt_min)
-
-        self._super_corners = np.asarray(corners)
-        assert len(self._super_corners) == len(img_corners)
-
     def __map_corners(self, corners):
         self._corner_map = np.empty(len(corners), dtype=int)
         p_idx = 0
@@ -253,8 +229,8 @@ class Contour:
 
         for c in corners:
             while True:
-                p = self._contour[p_idx]
-                if np.array_equal(c, p):
+                p = self._cnt_off[p_idx]
+                if np.array_equal(c, p[0]):
                     self._corner_map[c_idx] = p_idx
                     c_idx += 1
                     p_idx = (p_idx + 1) % self._cnt_len
@@ -268,16 +244,18 @@ class Contour:
         result = list()
         i = self._corner_map[0]
 
-        for j_idx in range(1, len(self._corner_map) + 1):
-            j = self._corner_map[j_idx % len(self._corner_map)]
-            diff = j - i if j > i else self._cnt_len - i + j
+        for j_idx in range(1, len(self._corner_map)):
+            j = self._corner_map[j_idx]
+            diff = j - i if j > i else len(self._contour) - i + j
             segments = round(diff / cnt_len_per_segment)
             if segments > 0:
-                segment_len = diff / segments
+                segment_len = int(diff / segments)
                 for s in range(segments):
-                    k = (i + int(s * segment_len)) % self._cnt_len
-                    result.append(self._contour[k])
+                    result.append(self._contour[i])
+                    i = (i + segment_len) % self._cnt_len
             i = j
+        # add last corner
+        result.append(self._contour[i])
         self._norm_contour = np.asarray(result)
 
     def __normalize_contour2(self, num_pts):
@@ -289,44 +267,15 @@ class Contour:
 
         for j_idx in range(1, len(self._corner_map) + 1):
             j = self._corner_map[j_idx % len(self._corner_map)]
-            diff = j - i if j > i else self._cnt_len - i + j
+            diff = j - i if j > i else len(self._cnt_off) - i + j
             segment_len = int(diff / pts_per_corner)
             for k in range(pts_per_corner):
-                result.append(self._contour[i % self._cnt_len])
+                result.append(self._cnt_off[i % self._cnt_len])
                 i = (i + segment_len) % self._cnt_len
             i = j
         self._norm_contour = np.asarray(result)
+
         assert len(self._norm_contour) == num_pts
-
-    def __normalize_contour3(self, other: "Contour"):
-        # match my corners to the other counter's corners
-        # then divide each segment to match the # points for each pair of matched corners
-        result = dict()
-        j_max = -1
-
-        for i in range(len(self._corn_off)):
-            pt1 = self._corn_off[i]
-            d_min = 999999999
-            j_min = 0
-            for j in range(len(other._corn_off)):
-                pt2 = other._corn_off[j]
-                d = np.linalg.norm(np.subtract(pt1, pt2))
-                if d_min > d:
-                    d_min = d
-                    j_min = j
-
-            if (result.get(j_min) is not None) and (result[j_min][1] < d_min or (j_min < j_max)):
-                continue
-
-            j_max = j_min
-            result[j_min] = (i, d_min)
-
-        # result now has for a map from corner (idx) of the other contour to closest corner (idx) on my contour
-
-        print("Contours::__NormContour3/result: ",result) #Added Debug
-        print("Contours::__NormContour3/other: ",other) #Added Debug
-
-        assert len(self._norm_contour) == other.num_pts()
 
     @staticmethod
     def find_contours(mask, type=cv2.CHAIN_APPROX_NONE):
@@ -346,28 +295,27 @@ class Contour:
         cv2.drawContours(norm_mask, tuple(n1), -1, color=(255, 255, 255), thickness=cv2.FILLED)
         return norm_mask
 
-    def __init__(self, mask, other: "Contour" = None):
+    def __init__(self, mask, num_pts=0):
         # the higher the number, the rougher the corner estimation
         self.CORNER_APPROX_EPSILON = 8.0
 
         self._mask = mask
         self._contour = Contour.find_contours(mask)
-        self._corners = cv2.approxPolyDP(self._contour, self.CORNER_APPROX_EPSILON, True)
-        self._cnt_len = len(self._contour) + 1  # because it's in pixels
+        self._corners = np.empty(0)
 
-        # map the corners back into the contour and normalize
-        self.__find_super_corners()
-        self.__map_corners(self._corners)
+        self._corners = cv2.approxPolyDP(self._contour, self.CORNER_APPROX_EPSILON, True)
+
+        self._cnt_len = len(self._contour)
 
         self._rect = cv2.boundingRect(self._contour)
         self._offset = (int(self._mask.shape[1] / 2 - (self._rect[0] + self._rect[2] / 2)),
                         int(self._mask.shape[0] / 2 - (self._rect[1] + self._rect[3] / 2)))
+
         self._cnt_off = self._contour + self._offset
         self._corn_off = self._corners + self._offset
 
         # map the corners back into the contour and normalize
         self.__find_super_corners()
-        #self.__find_super_corners_slow()
         self.__map_corners(self._super_corners)
         self.__fix_super_corners()
         self.__normalize_contour2(num_pts)
@@ -384,7 +332,6 @@ class Contour:
         # self.cnt_off = self.__contour + self._offset
         # self.corn_off = self.corners + self._offset
         #self._norm_contour = self._norm_contour + self._offset
-
 
     def mask(self):
         return self._mask
