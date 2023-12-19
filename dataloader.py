@@ -11,6 +11,7 @@ import torch
 import numpy as np
 import pandas as pd
 import math
+from math import inf
 import cv2
 import albumentations
 import multiprocessing
@@ -93,10 +94,10 @@ class CobotLoaderBinary(Dataset):
         img_pair2 = self.files[idx2]
         
         iter_lim=0
-        while iter_lim < 10 and similarity>np.abs(self.sim_score):
+        while iter_lim < 10 and similarity<np.abs(self.sim_score):
             idx2 = np.random.choice(len(self.files))
             img_pair2 = self.files[idx2]
-            similarity=self.__get_item_pair_similarity(idx1,idx2)
+            similarity=self.__get_item_pair_similarity(idx,idx2)
             print(f"Generate_Augs::PairSimilarity S={similarity}")
             iter_lim+=1
         if (iter_lim>=10):
@@ -174,7 +175,11 @@ class CobotLoaderBinary(Dataset):
         self.aug_gens=dict()
         self.aug_method=aug_method
         self.k_aug=k_aug
-        self.sim_score=sim_score
+
+        if sim_score is not None:
+            self.sim_score=sim_score
+        else:
+            self.sim_score=inf
         
         if seed:
             np.random.seed(seed)
@@ -233,6 +238,7 @@ class CobotLoaderBinary(Dataset):
             #print("Getitem:AugMethod ",self.aug_method)
             if "rand_pair" in self.aug_method:
                 print("Getitem/aug_method -- Detected Global Rand Pair")
+                self.sim_score=inf
                 img=self.__generate_aug_single(idx)
             if "sim_pair" in self.aug_method and self.sim_score is not None:
                 print("Getitem/aug_method -- Detected Global Similar Pair")

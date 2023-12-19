@@ -198,7 +198,6 @@ for e in range(cfg.epochs):
     val_accuracy = []
 
     for img, lbl, _ in train_loader:
-        sys.exit()
         if img.size(0) < 2:
             continue
         img = img.to(device)
