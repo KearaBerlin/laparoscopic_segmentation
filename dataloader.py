@@ -83,7 +83,7 @@ class CobotLoaderBinary(Dataset):
         for contour in contours:
             similarity = cv2.matchShapes(ref_contour, contour, cv2.CONTOURS_MATCH_I1, 0.0)
             #We should only get one item, right?
-            print(f"Dataloader::Similarity({idx1},{idx2})={similarity}")
+            #print(f"Dataloader::Similarity({idx1},{idx2})={similarity}")
 
         return similarity
         
@@ -92,16 +92,16 @@ class CobotLoaderBinary(Dataset):
         img_pair1 = self.files[idx]
         idx2 = np.random.choice(len(self.files))
         img_pair2 = self.files[idx2]
-        
+        #print("Generate_Augs:: similarity,sim_score: ",similarity,self.sim_score)
         iter_lim=0
-        while iter_lim < 10 and similarity<np.abs(self.sim_score):
+        while iter_lim < 10 and similarity>=np.abs(self.sim_score):
             idx2 = np.random.choice(len(self.files))
             img_pair2 = self.files[idx2]
             similarity=self.__get_item_pair_similarity(idx,idx2)
-            print(f"Generate_Augs::PairSimilarity S={similarity}")
+            #print(f"Generate_Augs::PairSimilarity S={similarity}")
             iter_lim+=1
         if (iter_lim>=10):
-            print("Generate_Augs::PairSimilarity Too many tries to meet similarity threshold")
+            #print("Generate_Augs::PairSimilarity Too many tries to meet similarity threshold")
         
         gen = self.aug_gens.get(idx)
         if gen is None:
@@ -237,11 +237,11 @@ class CobotLoaderBinary(Dataset):
         if do_aug == True:
             #print("Getitem:AugMethod ",self.aug_method)
             if "rand_pair" in self.aug_method:
-                print("Getitem/aug_method -- Detected Global Rand Pair")
+                #print("Getitem/aug_method -- Detected Global Rand Pair")
                 self.sim_score=inf
                 img=self.__generate_aug_single(idx)
             if "sim_pair" in self.aug_method and self.sim_score is not None:
-                print("Getitem/aug_method -- Detected Global Similar Pair")
+                #print("Getitem/aug_method -- Detected Global Similar Pair")
                 img=self.__generate_aug_single(idx,self.sim_score)
                 
 
