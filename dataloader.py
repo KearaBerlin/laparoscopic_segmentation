@@ -55,13 +55,12 @@ class CobotLoaderBinary(Dataset):
         #print("Generate_Augs/num: ",num)
 
         k_num = num * k
-        i_num = 0
         perms = list(itertools.permutations(range(num), 2))
         #print("Generate_Augs/perms: ",perms)
-        pairs = random.sample(perms, int((num-1) * (num-1)))
+        pairs = random.sample(perms, int((k_num) * (k_num)))
         if seed:
             rng = random.Random(42)
-            pairs = rng.sample(perms, int((num-1) * (num-1)))
+            pairs = rng.sample(perms, int((k_num) * (k_num)))
         gens = dict()
         
         #print("Generate_Augs/gens: ",gens)
@@ -87,9 +86,7 @@ class CobotLoaderBinary(Dataset):
 
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
-            i_num+=1
-            if i_num>=k_num:
-                break #End Aug Loop after we collect k_num augmented images
+
     """
     def __get_item_pair_similarity(self,idx1,idx2):
         #gray = cv2.cvtColor(self.labels[idx1], cv2.COLOR_BGR2GRAY)
