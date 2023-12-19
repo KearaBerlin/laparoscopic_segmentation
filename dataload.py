@@ -1,3 +1,5 @@
+# NOT CURRENTLY USED - copy of unmodified original authors dataloader.py (?)
+
 import os, sys
 
 from torch._C import dtype
