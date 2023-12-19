@@ -9,7 +9,7 @@ from contours import Contour
 class SegGen2:
 
     def __init__(self, image_file_name, mask_file_name):
-        self.MAX_CONTOUR_PTS = 96
+        self.MAX_CONTOUR_PTS = 48
         self.img1 = cv2.imread(image_file_name)
         self.mask1 = cv2.imread(mask_file_name)
         self.contour = Contour(self.mask1, self.MAX_CONTOUR_PTS)
@@ -34,10 +34,11 @@ class SegGen2:
         t1 = tuple(n1)
         cv2.drawContours(img, t1, 0, color, thickness)
 
-    def __debug(self, contour2, obj2_off):
+    def __debug(self, contour2, obj2_off, obj2_warped):
         ######################################################
         cv2.namedWindow("debug1", cv2.WINDOW_NORMAL)
         cv2.namedWindow("debug2", cv2.WINDOW_NORMAL)
+        cv2.namedWindow("debug3", cv2.WINDOW_NORMAL)
 
         norm_ctrs1 = self.contour.contour()[:, 0, :].astype(int)
         n1 = np.empty(tuple([1]) + norm_ctrs1.shape, dtype=int)
@@ -54,15 +55,45 @@ class SegGen2:
                                        self.contour.roi(), self.contour.offset())
         debug_i1 = np.copy(obj1_off)
 
-        cv2.drawContours(debug_i1, t1, 0, (0, 255, 255), 1)
-        cv2.drawContours(debug_i2, t2, 0, (255, 0, 255), 1)
+        cv2.drawContours(debug_i1, t1, 0, (255, 255, 255), 1)
+        cv2.drawContours(debug_i2, t2, 0, (255, 255, 255), 1)
 
-        for i in range(len(norm_ctrs1)):
-            debug_i1 = cv2.circle(debug_i1, norm_ctrs1[i], 5, color=(255 if i == 0 else 0, 255, 255), thickness=-1)
-            debug_i2 = cv2.circle(debug_i2, norm_ctrs2[i], 5, color=(255, 255 if i == 0 else 0, 255), thickness=-1)
+        img_corners = np.asarray([[0, 0], [obj2_off.shape[1] / 2, 0], [obj2_off.shape[1], 0],
+                       [obj2_off.shape[1], obj2_off.shape[0] / 2], [obj2_off.shape[1], obj2_off.shape[0]],
+                       [obj2_off.shape[1] / 2, obj2_off.shape[0]], [0, obj2_off.shape[0]],
+                       [0, obj2_off.shape[0] / 2]]).astype(int)
+
+        # for i in range(len(norm_ctrs1)):
+        #    debug_i1 = cv2.circle(debug_i1, norm_ctrs1[i], 5, color=(255, 255, 255 if i > 0 else 0), thickness=-1)
+        #    debug_i2 = cv2.circle(debug_i2, norm_ctrs2[i], 5, color=(255, 255, 255 if i > 0 else 0), thickness=-1)
+
+
+        # super_corners1 = np.asarray(self.contour._super_corners).astype(int)
+        # super_corners2 = np.asarray(contour2._super_corners).astype(int)
+        for i in range(len(img_corners)):
+            debug_i1 = cv2.circle(debug_i1, img_corners[i], 5, color=(255, 255, 255), thickness=-1)
+            debug_i2 = cv2.circle(debug_i2, img_corners[i], 5, color=(255, 255, 255), thickness=-1)
+            debug_i1 = cv2.circle(debug_i1, self.contour._cnt_off[self.contour._corner_map[i]][0], 5, color=(0, 0, 255), thickness=-1)
+            debug_i2 = cv2.circle(debug_i2, contour2._cnt_off[contour2._corner_map[i]][0], 5, color=(0, 0, 255), thickness=-1)
+
+        # for c in self.contour.corners():
+        #     debug_i1 = cv2.circle(debug_i1, c[0], 5, color=(255, 0, 0), thickness=-1)
+        #
+        # for c in contour2.corners():
+        #     debug_i2 = cv2.circle(debug_i2, c[0], 5, color=(255, 0, 0), thickness=-1)
+        #
+        # corner_map = list(contour2.match_corners_to_other(self.contour).items())
+        # corner_map2 = list(self.contour.match_corners_to_other(contour2).items())
+        #
+        # for m in corner_map:
+        #     i = m[0]
+        #     j = m[1][0]
+        #     debug_i1 = cv2.circle(debug_i1, self.contour.contour()[i][0], 5, color=(0, 0, 255), thickness=-1)
+        #     debug_i2 = cv2.circle(debug_i2, contour2.corners()[j][0], 5, color=(0, 0, 255), thickness=-1)
 
         cv2.imshow("debug1", debug_i1)
         cv2.imshow("debug2", debug_i2)
+        cv2.imshow("debug3", obj2_warped)
 
     def __generate_obj2(self, img2, contour2):
         # create the object used for the transformation
@@ -100,16 +131,10 @@ class SegGen2:
         obj2_contour = Contour.find_contours(obj2_warped, cv2.CHAIN_APPROX_TC89_L1)
         obj2_contour_img = np.zeros_like(self.mask1)
 
-        #self.__debug(contour2,obj2_off)
-
         if len(obj2_contour) == 0:
-            # try with fewer point?
-            if self.MAX_CONTOUR_PTS == 96:
-                self.MAX_CONTOUR_PTS /= 2
-                self.contour = Contour(self.mask1, self.MAX_CONTOUR_PTS)
-                return self.generate(image_file_name, mask_file_name)
-            else:
-                return self.img1
+            return self.img1
+
+        self.__debug(contour2,obj2_off, obj2_warped)
 
         self.__draw_contour(obj2_contour_img, obj2_contour)
 
