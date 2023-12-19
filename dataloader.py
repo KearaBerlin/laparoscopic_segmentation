@@ -17,7 +17,7 @@ import multiprocessing
 
 from seg_gen2 import SegGen2
 
-
+# This class is modified from the original authors' open source code
 class CobotLoaderBinary(Dataset):
 
     def __add_file(self, img, mask_orig):
@@ -37,6 +37,7 @@ class CobotLoaderBinary(Dataset):
         self.images.append(img)
         self.labels.append(mask)
 
+    # new function added Fall 2023
     def __generate_aug(self, k, seed=False):
         assert 0 <= k <= 1.0
 
@@ -65,11 +66,13 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
 
+    # new function Fall 2023
     def add_file_and_mask(self, file):
         
         mask_filename = file.replace("image", "mask")
         self.files.append((file, mask_filename))
 
+    # new function Fall 2023
     def add_neg_imgs(self):
         root = Path(self.root_dir)
         data_dir = root.parent.parent.absolute()
@@ -123,6 +126,7 @@ class CobotLoaderBinary(Dataset):
         self.num_labels = num_labels
         self.image_size = image_size
 
+        # added some new logic to this function Fall 2023
         self.files = []
         self.organ_ii = []
         i = 0
