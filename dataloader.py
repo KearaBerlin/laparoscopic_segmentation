@@ -34,7 +34,13 @@ class CobotLoaderBinary(Dataset):
         self.num_bg_pixels += np.sum(mask_orig == 0)
         self.num_pixels += mask_orig.shape[0] * mask_orig.shape[1]
 
-        mask = (mask_orig > 0) * 1
+        #mask_manual = (mask_orig > 0) * 1
+        _, mask=cv2.threshold(mask_orig, 127, 255, cv2.THRESH_BINARY)
+        #cv2.imshow("orig_mask",mask_orig)
+        #cv2.imshow("thrsh_mask",mask)
+        #cv2.imshow("trsh_manual",mask_manual)
+        #cv2.waitKey()
+        #sys.exit()
 
         self.images.append(img)
         self.labels.append(mask)
@@ -42,7 +48,7 @@ class CobotLoaderBinary(Dataset):
     def __generate_aug(self, k, seed=False):
         assert 0 <= k <= 1.0
 
-        print("Generate_Augs/k: ",k)
+        #print("Generate_Augs/k: ",k)
         num = len(self.files)
 
         k_num = num * k
@@ -52,8 +58,8 @@ class CobotLoaderBinary(Dataset):
             rng = random.Random(42)
             pairs = rng.sample(perms, int(k_num * k_num))
         gens = dict()
-        print("Generate_Augs/perms: ",perms)
-        print("Generate_Augs/gens: ",gens)
+        #print("Generate_Augs/perms: ",perms)
+        #print("Generate_Augs/gens: ",gens)
 
         for p in pairs:
             i_0 = self.organ_ii[p[0]]
@@ -71,19 +77,16 @@ class CobotLoaderBinary(Dataset):
             mask_orig = cv2.imread(img_pair1[1], cv2.IMREAD_GRAYSCALE)
             self.__add_file(img, mask_orig)
     def __get_item_pair_similarity(self,idx1,idx2):
-        gray = cv2.cvtColor(self.images[idx1], cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
-        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        #gray = cv2.cvtColor(self.labels[idx1], cv2.COLOR_BGR2GRAY)
+        #_, thresh = cv2.threshold(self.labels[idx1], 127, 255, cv2.THRESH_BINARY_INV)
+        contours, _ = cv2.findContours(self.labels[idx1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        ref_gray = cv2.cvtColor(self.images[idx2], cv2.COLOR_BGR2GRAY)
-        _, ref_thresh = cv2.threshold(ref_gray, 127, 255, cv2.THRESH_BINARY_INV)
-        ref_contours, _ = cv2.findContours(ref_thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        ref_contour = max(ref_contours, key=cv2.contourArea)
-        
-        for contour in contours:
-            similarity = cv2.matchShapes(ref_contour, contour, cv2.CONTOURS_MATCH_I1, 0.0)
-            #We should only get one item, right?
-            #print(f"Dataloader::Similarity({idx1},{idx2})={similarity}")
+        #ref_gray = cv2.cvtColor(self.labels[idx2], cv2.COLOR_BGR2GRAY)
+        #_, ref_thresh = cv2.threshold(self.labels[idx2], 127, 255, cv2.THRESH_BINARY_INV)
+        ref_contours, _ = cv2.findContours(self.labels[idx2], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #ref_contour = max(ref_contours, key=cv2.contourArea)
+        similarity = cv2.matchShapes(ref_contours[0], contours[0], cv2.CONTOURS_MATCH_I1,0.0)
+        #print(f"Dataloader::Similarity({self.files[idx1][1]},{self.files[idx2][1]})={similarity}")
 
         return similarity
         
@@ -95,13 +98,14 @@ class CobotLoaderBinary(Dataset):
         #print("Generate_Augs:: similarity,sim_score: ",similarity,self.sim_score)
         iter_lim=0
         while iter_lim < 10 and similarity>=np.abs(self.sim_score):
-            idx2 = np.random.choice(len(self.files))
+            #idx2 = np.random.choice(len(self.files))
+            idx2=self.rng.choice(len(self.files))[0]
             img_pair2 = self.files[idx2]
             similarity=self.__get_item_pair_similarity(idx,idx2)
             #print(f"Generate_Augs::PairSimilarity S={similarity}")
             iter_lim+=1
         if (iter_lim>=10):
-            #print("Generate_Augs::PairSimilarity Too many tries to meet similarity threshold")
+            print("Generate_Augs::PairSimilarity Too many tries to meet similarity threshold")
         
         gen = self.aug_gens.get(idx)
         if gen is None:
@@ -183,16 +187,16 @@ class CobotLoaderBinary(Dataset):
         
         if seed:
             np.random.seed(seed)
-        
+        self.rng = np.random.default_rng()
         #Batchwise not tested! -- This is only for mutual augmentation within batch.
         if 'batchwise' in self.aug_method and batch_size >10:
-            print('Dataloader:__init__  Using Batchwise augmentation pairing')
+            #print('Dataloader:__init__  Using Batchwise augmentation pairing')
             self.batch_size=batch_size
             self.batch_idx=0
             self.batch_current=[None]*batch_size
         else:
             self.batch_size=1
-            print('Dataloader:__init__  Using Global augmentation pairing')
+            #print('Dataloader:__init__  Using Global augmentation pairing')
 
         self.files = []
         self.organ_ii = []
@@ -231,8 +235,8 @@ class CobotLoaderBinary(Dataset):
             q=(n*k)/(n+(n*k)) #Calculate P of choosing augmented sample from augmentation fraction k
             assert(q<1)
             p=1-q
-            do_aug=np.random.choice((False,True),self.batch_size,(p,q))
-        
+            #do_aug=np.random.Generator.choice((False,True),size=self.batch_size,p=(p,q))
+            do_aug=self.rng.choice((False,True),size=self.batch_size,p=(p,q))[0]
         
         if do_aug == True:
             #print("Getitem:AugMethod ",self.aug_method)
@@ -279,6 +283,6 @@ class CobotLoaderBinary(Dataset):
             img = transformed["image"]
             mask = transformed["mask"]
             
-        print('Dataloader::Getitem/Index,Aug',idx,do_aug)
+        #print('Dataloader::Getitem/Index,Aug',idx,do_aug)
         return img, mask, self.label
         

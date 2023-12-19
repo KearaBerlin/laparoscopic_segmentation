@@ -11,7 +11,8 @@ class Config():
     # parser.add_argument("--unet", help="Specifity to use UNet instead of DeepLabV3"
 
     ORGAN_ID = 4
-    DATA_DIR = r"/scratch.global/laparoscopic_segmentation/Dresden/"
+    #DATA_DIR = r"/scratch.global/laparoscopic_segmentation/Dresden/"
+    DATA_DIR = "./Dresden/"
     OUTPUT_DIR = "."
     SEGFORMER = False
     UNET = False
