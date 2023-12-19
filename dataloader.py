@@ -34,8 +34,9 @@ class CobotLoaderBinary(Dataset):
         self.num_bg_pixels += np.sum(mask_orig == 0)
         self.num_pixels += mask_orig.shape[0] * mask_orig.shape[1]
 
-        #mask_manual = (mask_orig > 0) * 1
-        _, mask=cv2.threshold(mask_orig, 127, 255, cv2.THRESH_BINARY)
+        mask = (mask_orig > 0) * 1
+        #print("AddFile::Mask ",mask.shape,mask_manual)
+        _, mask_image=cv2.threshold(mask_orig, 127, 255, cv2.THRESH_BINARY)
         #cv2.imshow("orig_mask",mask_orig)
         #cv2.imshow("thrsh_mask",mask)
         #cv2.imshow("trsh_manual",mask_manual)
@@ -44,6 +45,7 @@ class CobotLoaderBinary(Dataset):
 
         self.images.append(img)
         self.labels.append(mask)
+        self.masks.append(mask_image)
 
     def __generate_aug(self, k, seed=False):
         assert 0 <= k <= 1.0
@@ -79,11 +81,11 @@ class CobotLoaderBinary(Dataset):
     def __get_item_pair_similarity(self,idx1,idx2):
         #gray = cv2.cvtColor(self.labels[idx1], cv2.COLOR_BGR2GRAY)
         #_, thresh = cv2.threshold(self.labels[idx1], 127, 255, cv2.THRESH_BINARY_INV)
-        contours, _ = cv2.findContours(self.labels[idx1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(self.masks[idx1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         #ref_gray = cv2.cvtColor(self.labels[idx2], cv2.COLOR_BGR2GRAY)
         #_, ref_thresh = cv2.threshold(self.labels[idx2], 127, 255, cv2.THRESH_BINARY_INV)
-        ref_contours, _ = cv2.findContours(self.labels[idx2], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        ref_contours, _ = cv2.findContours(self.masks[idx2], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         #ref_contour = max(ref_contours, key=cv2.contourArea)
         similarity = cv2.matchShapes(ref_contours[0], contours[0], cv2.CONTOURS_MATCH_I1,0.0)
         #print(f"Dataloader::Similarity({self.files[idx1][1]},{self.files[idx2][1]})={similarity}")
@@ -93,13 +95,13 @@ class CobotLoaderBinary(Dataset):
     def __generate_aug_single(self, idx, similarity=-1):
         #weights is an optional dictionary of (idx,weight) to set pair selection. None defaults to uniform, global selection
         img_pair1 = self.files[idx]
-        idx2 = np.random.choice(len(self.files))
+        idx2 = self.rng.choice(len(self.files))
         img_pair2 = self.files[idx2]
         #print("Generate_Augs:: similarity,sim_score: ",similarity,self.sim_score)
         iter_lim=0
         while iter_lim < 10 and similarity>=np.abs(self.sim_score):
             #idx2 = np.random.choice(len(self.files))
-            idx2=self.rng.choice(len(self.files))[0]
+            idx2=self.rng.choice(len(self.files))
             img_pair2 = self.files[idx2]
             similarity=self.__get_item_pair_similarity(idx,idx2)
             #print(f"Generate_Augs::PairSimilarity S={similarity}")
@@ -158,6 +160,7 @@ class CobotLoaderBinary(Dataset):
         self.root_dir = root_dir
         self.images = []
         self.labels = []
+        self.masks = []
 
         self.label = label
         self.organ_name = organ_name
